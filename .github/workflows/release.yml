@@ -48,9 +48,45 @@ jobs:
             After install, Orblune opens from the system tray. Use **Check for updates** in About to stay current.
 
             ### Security
-            After publish, CI uploads the installer to [VirusTotal](https://www.virustotal.com/) and appends analysis links below.
+            CI uploads the installer to [VirusTotal](https://www.virustotal.com/) and appends analysis links below.
             Unsigned Windows apps may still show SmartScreen once; choose **More info → Run anyway**.
             A paid Authenticode certificate is what improves SmartScreen trust over time.
           releaseDraft: false
           prerelease: false
           args: --target x86_64-pc-windows-msvc
+
+      # GITHUB_TOKEN-created releases do not trigger separate `release` workflows,
+      # so VirusTotal must run in this same job.
+      - name: VirusTotal scan installer
+        id: vt
+        uses: crazy-max/ghaction-virustotal@v5
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          request_rate: 4
+          files: |
+            **/Orblune_*_x64-setup.exe
+
+      - name: Append VirusTotal links to release notes
+        if: ${{ success() && steps.vt.outputs.analysis != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANALYSIS: ${{ steps.vt.outputs.analysis }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          body="$(gh release view "$TAG" --json body -q .body)"
+          {
+            printf '%s\n\n' "$body"
+            echo "### VirusTotal"
+            echo ""
+            IFS=',' read -ra parts <<< "$ANALYSIS"
+            for part in "${parts[@]}"; do
+              [ -z "$part" ] && continue
+              file="${part%%=*}"
+              url="${part#*=}"
+              base="$(basename "$file")"
+              echo "- [\`${base}\`](${url})"
+            done
+          } > release-body.md
+          gh release edit "$TAG" --notes-file release-body.md
