@@ -45,7 +45,7 @@ jobs:
 
             Download **Orblune_*_x64-setup.exe** and double-click to install (current user, no admin).
 
-            After install, Orblune opens from the system tray.
+            After install, Orblune opens from the system tray. Use **Check for updates** in About to stay current.
 
             ### Security
             After publish, CI uploads the installer to [VirusTotal](https://www.virustotal.com/) and appends analysis links below.
