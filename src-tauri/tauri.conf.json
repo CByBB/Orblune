@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Orblune",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.aesop.orblune",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -42,11 +42,6 @@
     ],
     "security": {
       "csp": "default-src 'self'; img-src 'self' asset: https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self' https://api.met.no https://ipc.met.no https://*.workers.dev http://localhost:* ipc: http://ipc.localhost"
-    },
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": false,
-      "tooltip": "Orblune"
     }
   },
   "bundle": {
