@@ -1,0 +1,14 @@
+name = "orblune-pay"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+
+[[kv_namespaces]]
+binding = "ORDERS"
+id = "94e91d985cd549b5a1d87302bc0afa0f"
+preview_id = "02282d3b548047a188ddbd85b768f7af"
+
+[vars]
+NOWPAYMENTS_API_URL = "https://api.nowpayments.io/v1"
+PRODUCT_NAME = "Orblune Premium"
+PRICE_AMOUNT = "5"
+PRICE_CURRENCY = "usd"

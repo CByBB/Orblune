@@ -1,0 +1,205 @@
+.wallpaper-root,
+.globe-root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background: #03060c;
+}
+
+.wallpaper-empty {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+.map-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.map-labels {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.city-label {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  transform: translate(-50%, calc(-100% - 14px));
+  transition: opacity 0.18s ease;
+  will-change: left, top, opacity;
+}
+
+.city-label-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+  padding: 10px 14px 11px;
+  border-radius: 2px;
+  background: rgba(4, 10, 16, 0.78);
+  border: 1px solid rgba(220, 235, 245, 0.16);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 16px 40px rgba(0, 0, 0, 0.45);
+  color: #f4f8fb;
+  font-family: "Outfit", "Segoe UI", sans-serif;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  white-space: nowrap;
+  backdrop-filter: blur(20px) saturate(1.15);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+}
+
+/* Stem from card to map point */
+.city-label-inner::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: 1px;
+  height: 12px;
+  margin-left: -0.5px;
+  background: linear-gradient(180deg, rgba(200, 220, 235, 0.45), rgba(200, 220, 235, 0.05));
+}
+
+.city-label::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: #e8f2f8;
+  box-shadow:
+    0 0 0 1px rgba(4, 10, 16, 0.9),
+    0 0 12px rgba(160, 210, 230, 0.55);
+}
+
+.city-label.home .city-label-inner {
+  border-color: rgba(143, 214, 234, 0.45);
+  background: rgba(6, 16, 26, 0.86);
+  box-shadow:
+    0 1px 0 rgba(143, 214, 234, 0.08) inset,
+    0 0 0 1px rgba(110, 200, 224, 0.08),
+    0 18px 44px rgba(0, 0, 0, 0.5);
+}
+
+.city-label.home .city-label-inner::after {
+  background: linear-gradient(180deg, rgba(143, 214, 234, 0.7), rgba(143, 214, 234, 0.08));
+}
+
+.city-label.home::after {
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  background: #8fd6ea;
+  box-shadow:
+    0 0 0 1px rgba(4, 10, 16, 0.95),
+    0 0 16px rgba(143, 214, 234, 0.85);
+}
+
+.city-time {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #f7fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.city-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(220, 235, 245, 0.12);
+  width: 100%;
+}
+
+.city-name {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(230, 240, 248, 0.88);
+}
+
+.city-tz {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(160, 190, 210, 0.65);
+}
+
+.city-weather {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(170, 210, 225, 0.95);
+}
+
+.city-weather:empty {
+  display: none;
+}
+
+.city-weather svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.globe-preview .city-label {
+  transform: translate(-50%, calc(-100% - 12px));
+}
+
+.globe-preview .city-label-inner {
+  padding: 8px 11px 9px;
+}
+
+.globe-preview .city-label-inner::after {
+  bottom: -12px;
+  height: 10px;
+}
+
+.globe-preview .city-time {
+  font-size: 17px;
+}
+
+.globe-preview .city-meta {
+  margin-top: 5px;
+  padding-top: 5px;
+  gap: 6px;
+}
+
+.globe-preview .city-name {
+  font-size: 9px;
+}
+
+.globe-preview .city-tz {
+  font-size: 8px;
+}
+
+.globe-preview .city-weather {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.globe-preview {
+  background: #03060c;
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Orblune",
+  "version": "0.1.0",
+  "identifier": "com.aesop.orblune",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "settings",
+        "title": "Orblune",
+        "width": 1280,
+        "height": 640,
+        "minWidth": 1100,
+        "minHeight": 560,
+        "resizable": true,
+        "visible": true,
+        "center": true,
+        "decorations": true
+      },
+      {
+        "label": "wallpaper",
+        "title": "Orblune Wallpaper",
+        "url": "/wallpaper.html",
+        "width": 800,
+        "height": 600,
+        "resizable": false,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
+        "alwaysOnBottom": false,
+        "focus": false,
+        "shadow": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: https: data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self' https://api.met.no https://ipc.met.no https://*.workers.dev http://localhost:* ipc: http://ipc.localhost"
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": false,
+      "tooltip": "Orblune"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "startMenuFolder": "Orblune",
+        "displayLanguageSelector": false
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZERTMxMEMyQTJEQjIzMjEKUldRaEk5dWl3aERqYmNCcTVWQkNXMGdnUWNHVFdQYTRoRUlXWHgxWkZqZmZqc2lKK2Rwc0IrUDIK",
+      "endpoints": [
+        "https://github.com/CByBB/Orblune/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}
