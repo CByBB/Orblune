@@ -1,0 +1,34 @@
+name: VirusTotal
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require VirusTotal API key
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          if [ -z "$VT_API_KEY" ]; then
+            echo "::error::Add repository secret VT_API_KEY (free key from https://www.virustotal.com/gui/my-apikey)"
+            exit 1
+          fi
+
+      - name: Scan release installers
+        uses: crazy-max/ghaction-virustotal@v4
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          update_release_body: true
+          # Free public API allows ~4 requests/minute
+          request_rate: 4
+          files: |
+            .exe$
+            setup\.exe$
+            Orblune_.*\.exe$

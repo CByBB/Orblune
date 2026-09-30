@@ -84,6 +84,15 @@ GitHub Actions builds the Windows x64 NSIS installer and publishes the Release a
 
 Unsigned installers show Windows SmartScreen once (**More info → Run anyway**) until you add a paid Authenticode certificate.
 
+### VirusTotal on each release
+
+After a GitHub Release is published, `.github/workflows/virustotal.yml` uploads the `.exe` installers to VirusTotal and appends report links to the release notes.
+
+1. Create a free API key: https://www.virustotal.com/gui/my-apikey  
+2. Add it as repo secret `VT_API_KEY` (`gh secret set VT_API_KEY`)
+
+This is scan evidence from many AV engines — not a certificate, and not a SmartScreen whitelist.
+
 ## Attributions
 
 - Weather: © Norwegian Meteorological Institute / MET Norway — [Terms of Use](https://www.met.no/en/free-meteorological-data/Licensing-and-crediting)
