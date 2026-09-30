@@ -164,6 +164,74 @@
   opacity: 0.9;
 }
 
+.map-labels[data-label-size="small"] .city-label-inner {
+  padding: 7px 10px 8px;
+  transform: scale(0.84);
+  transform-origin: 50% 100%;
+}
+
+.map-labels[data-label-size="small"] .city-time {
+  font-size: 17px;
+}
+
+.map-labels[data-label-size="small"] .city-meta {
+  margin-top: 5px;
+  padding-top: 5px;
+  gap: 5px;
+}
+
+.map-labels[data-label-size="small"] .city-name {
+  font-size: 9px;
+}
+
+.map-labels[data-label-size="small"] .city-tz {
+  font-size: 8px;
+}
+
+.map-labels[data-label-size="small"] .city-weather {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.map-labels[data-label-size="small"] .city-weather svg {
+  width: 12px;
+  height: 12px;
+}
+
+.map-labels[data-label-size="large"] .city-label-inner {
+  padding: 12px 16px 13px;
+  transform: scale(1.16);
+  transform-origin: 50% 100%;
+}
+
+.map-labels[data-label-size="large"] .city-time {
+  font-size: 26px;
+}
+
+.map-labels[data-label-size="large"] .city-meta {
+  margin-top: 8px;
+  padding-top: 8px;
+  gap: 8px;
+}
+
+.map-labels[data-label-size="large"] .city-name {
+  font-size: 11px;
+}
+
+.map-labels[data-label-size="large"] .city-tz {
+  font-size: 10px;
+}
+
+.map-labels[data-label-size="large"] .city-weather {
+  margin-top: 7px;
+  font-size: 13px;
+}
+
+.map-labels[data-label-size="large"] .city-weather svg {
+  width: 16px;
+  height: 16px;
+}
+
 .globe-preview .city-label {
   transform: translate(-50%, calc(-100% - 12px));
 }

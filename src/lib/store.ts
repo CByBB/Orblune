@@ -3,7 +3,7 @@ import { CITIES, defaultEnabledCityIds, FREE_EXTRA_CITY_LIMIT } from "../data/ci
 import { DEFAULT_MAP_THEME, isMapThemeId, type MapThemeId } from "./mapThemes";
 
 export type TempUnit = "C" | "F";
-export type LabelDensity = "low" | "medium" | "high";
+export type LabelSize = "small" | "medium" | "large";
 export type { MapThemeId };
 
 export type AppSettings = {
@@ -17,7 +17,7 @@ export type AppSettings = {
   enabledCityIds: string[];
   tempUnit: TempUnit;
   hour12: boolean;
-  labelDensity: LabelDensity;
+  labelSize: LabelSize;
   mapTheme: MapThemeId;
   licenseToken: string | null;
   premium: boolean;
@@ -34,11 +34,26 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enabledCityIds: defaultEnabledCityIds(),
   tempUnit: "C",
   hour12: false,
-  labelDensity: "medium",
+  labelSize: "medium",
   mapTheme: DEFAULT_MAP_THEME,
   licenseToken: null,
   premium: false,
 };
+
+const LABEL_SIZES: LabelSize[] = ["small", "medium", "large"];
+
+export function isLabelSize(v: unknown): v is LabelSize {
+  return typeof v === "string" && LABEL_SIZES.includes(v as LabelSize);
+}
+
+function migrateLabelSize(raw: Record<string, unknown> | null | undefined): LabelSize {
+  if (raw && isLabelSize(raw.labelSize)) return raw.labelSize;
+  // Older builds used labelDensity
+  const density = raw?.labelDensity;
+  if (density === "low") return "small";
+  if (density === "high") return "large";
+  return "medium";
+}
 
 let storePromise: Promise<Store> | null = null;
 
@@ -52,8 +67,12 @@ async function getStore(): Promise<Store> {
 export async function loadSettings(): Promise<AppSettings> {
   try {
     const store = await getStore();
-    const raw = await store.get<Partial<AppSettings>>("settings");
-    const merged = { ...DEFAULT_SETTINGS, ...raw };
+    const raw = (await store.get<Record<string, unknown>>("settings")) ?? {};
+    const merged: AppSettings = {
+      ...DEFAULT_SETTINGS,
+      ...(raw as Partial<AppSettings>),
+      labelSize: migrateLabelSize(raw),
+    };
     if (!isMapThemeId(merged.mapTheme)) merged.mapTheme = DEFAULT_MAP_THEME;
     return merged;
   } catch {

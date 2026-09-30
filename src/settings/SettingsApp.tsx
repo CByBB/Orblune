@@ -5,6 +5,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { emit, emitTo } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 import { CITIES, FREE_EXTRA_CITY_LIMIT, searchCities } from "../data/cities";
 import { Globe } from "../wallpaper/Globe";
 import {
@@ -49,10 +50,16 @@ export function SettingsApp() {
   const [payError, setPayError] = useState<string | null>(null);
   const [restoreKey, setRestoreKey] = useState("");
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string>("…");
 
   useEffect(() => {
     let statusPoll = 0;
     (async () => {
+      try {
+        setAppVersion(await getVersion());
+      } catch {
+        setAppVersion("dev");
+      }
       const s = await loadSettings();
       setSettings(s);
       setLoaded(true);
@@ -523,20 +530,20 @@ export function SettingsApp() {
                   />
                 </label>
                 <label className="row">
-                  <span>Label density</span>
+                  <span>Label size</span>
                   <LineSelect
-                    aria-label="Label density"
+                    aria-label="Label size"
                     disabled={!settings.premium}
-                    value={settings.labelDensity}
+                    value={settings.labelSize}
                     options={[
-                      { value: "low", label: "Low" },
+                      { value: "small", label: "Small" },
                       { value: "medium", label: "Medium" },
-                      { value: "high", label: "High" },
+                      { value: "large", label: "Large" },
                     ]}
                     onChange={(v) =>
                       void persist({
                         ...settings,
-                        labelDensity: v as AppSettings["labelDensity"],
+                        labelSize: v as AppSettings["labelSize"],
                       })
                     }
                   />
@@ -555,7 +562,7 @@ export function SettingsApp() {
               <ul className="feature-list">
                 <li>Full city catalog</li>
                 <li>Weather on every city marker</li>
-                <li>Units, 12/24-hour clock, label density, map themes</li>
+                <li>Units, 12/24-hour clock, label size, map themes</li>
                 <li>Restore Premium on another PC with your license key</li>
               </ul>
               {settings.premium ? (
@@ -630,7 +637,7 @@ export function SettingsApp() {
           {tab === "about" && (
             <section>
               <h2>About</h2>
-              <p>Orblune 0.1.0</p>
+              <p>Orblune {appVersion}</p>
               <p className="muted">
                 Weather data from the Norwegian Meteorological Institute (MET Norway). Map: Natural Earth II by Tom Patterson. Day and night lighting computed on your PC.
               </p>

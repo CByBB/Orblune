@@ -232,16 +232,10 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
           showWeather: true,
         });
       }
-      if (s.labelDensity === "low") {
-        return [markers[0]!, ...markers.filter((m) => !m.isHome).slice(0, 2)];
-      }
-      // Preview pane is narrower — keep labels readable
       if (preview) {
         const extras = markers.filter((m) => !m.isHome);
-        const cap = s.labelDensity === "high" ? 5 : 4;
-        return [markers[0]!, ...extras.slice(0, cap)];
+        return [markers[0]!, ...extras.slice(0, 6)];
       }
-      if (s.labelDensity === "medium") return markers.slice(0, 10);
       return markers;
     }
 
@@ -392,6 +386,8 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       const s = settingsRef.current;
       const sun = subsolarPoint();
 
+      labelLayer.dataset.labelSize = s.labelSize ?? "medium";
+
       if (mapMat) {
         // Rebuild GPU program when shader source rev changes (wallpaper HMR / hot update)
         if (mapMat.userData.shaderRev !== MAP_SHADER_REV && dayTex && nightTex && cloudTex) {
@@ -447,6 +443,7 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     ro.observe(root);
 
     rebuildLabels(settingsRef.current);
+    labelLayer.dataset.labelSize = settingsRef.current.labelSize ?? "medium";
     animate();
 
     let lastJson = JSON.stringify(settingsRef.current);
