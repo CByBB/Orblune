@@ -75,7 +75,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          body="$(gh release view "$TAG" --json body -q .body)"
+          body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body)"
           {
             printf '%s\n\n' "$body"
             echo "### VirusTotal"
@@ -89,4 +89,4 @@ jobs:
               echo "- [\`${base}\`](${url})"
             done
           } > release-body.md
-          gh release edit "$TAG" --notes-file release-body.md
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-body.md

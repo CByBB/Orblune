@@ -73,9 +73,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANALYSIS: ${{ steps.vt.outputs.analysis }}
           TAG: ${{ steps.tag.outputs.name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          body="$(gh release view "$TAG" --json body -q .body)"
+          body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body)"
           if echo "$body" | grep -q "### VirusTotal"; then
             echo "Release notes already include VirusTotal section; skipping."
             exit 0
@@ -93,4 +94,4 @@ jobs:
               echo "- [\`${base}\`](${url})"
             done
           } > release-body.md
-          gh release edit "$TAG" --notes-file release-body.md
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-body.md
