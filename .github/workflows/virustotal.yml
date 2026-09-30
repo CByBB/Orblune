@@ -21,7 +21,7 @@ jobs:
           fi
 
       - name: Scan release installers
-        uses: crazy-max/ghaction-virustotal@v4
+        uses: crazy-max/ghaction-virustotal@v5
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
