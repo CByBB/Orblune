@@ -39,12 +39,12 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 0;
   box-sizing: border-box;
-  width: 176px;
-  min-width: 176px;
-  max-width: 176px;
+  width: 158px;
+  min-width: 158px;
+  max-width: 158px;
   padding: 12px 14px 12px;
   border-radius: 2px;
   background: rgba(4, 10, 16, 0.78);
@@ -55,6 +55,7 @@
   color: #f4f8fb;
   font-family: "Outfit", "Segoe UI", sans-serif;
   font-feature-settings: "tnum" 1, "lnum" 1;
+  text-align: center;
   white-space: nowrap;
   backdrop-filter: blur(20px) saturate(1.15);
   -webkit-backdrop-filter: blur(20px) saturate(1.15);
@@ -90,6 +91,8 @@
 .city-label.home {
   z-index: 3;
 }
+
+.city-label.home .city-label-inner {
   border-color: rgba(143, 214, 234, 0.45);
   background: rgba(6, 16, 26, 0.86);
   box-shadow:
@@ -113,10 +116,12 @@
 }
 
 .city-time {
+  width: 100%;
   font-size: 20px;
   font-weight: 500;
   letter-spacing: 0.02em;
   line-height: 1.1;
+  text-align: center;
   color: #f7fafc;
   font-variant-numeric: tabular-nums;
 }
@@ -124,6 +129,7 @@
 .city-meta {
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
@@ -141,6 +147,7 @@
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.1em;
+  text-align: center;
   text-transform: uppercase;
   color: rgba(230, 240, 248, 0.88);
 }
@@ -157,8 +164,10 @@
 .city-weather {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   margin-top: 8px;
+  width: 100%;
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -249,9 +258,9 @@
 }
 
 .globe-preview .city-label-inner {
-  width: 156px;
-  min-width: 156px;
-  max-width: 156px;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
   padding: 9px 11px 9px;
 }
 
