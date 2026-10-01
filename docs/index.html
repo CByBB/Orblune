@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orblune — Live Earth wallpaper for Windows</title>
+    <meta
+      name="description"
+      content="Orblune turns your Windows desktop into a live Earth map with real day and night lighting, local city times, and weather."
+    />
+    <meta property="og:title" content="Orblune — Live Earth wallpaper" />
+    <meta
+      property="og:description"
+      content="A calm, live Earth behind your icons — times and weather for cities that matter."
+    />
+    <meta property="og:image" content="assets/og-cover.jpg" />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#03060c" />
+    <link rel="icon" type="image/png" href="assets/favicon.png" />
+    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="top">
+      <a class="brand" href="#top" aria-label="Orblune home">
+        <img src="assets/orblune.svg" width="28" height="28" alt="" />
+        <span>Orblune</span>
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#themes">Themes</a>
+        <a href="#features">Features</a>
+        <a class="nav-cta" href="#download">Download</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="hero-visual" aria-hidden="true">
+          <img
+            class="hero-shot"
+            src="assets/shot-desktop-natural.jpg"
+            alt=""
+            width="1920"
+            height="1080"
+            fetchpriority="high"
+          />
+          <div class="hero-scrim"></div>
+        </div>
+        <div class="hero-copy">
+          <p class="brand-mark">Orblune</p>
+          <h1>Earth, live behind your icons.</h1>
+          <p class="lede">
+            Real sun lighting, city times, and weather on a quiet Windows wallpaper.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" id="download-btn" href="https://github.com/CByBB/Orblune/releases/latest">
+              Download for Windows
+            </a>
+            <a class="btn ghost" href="https://github.com/CByBB/Orblune">GitHub</a>
+          </div>
+          <p class="fine">Windows 10 &amp; 11 · current-user install · no admin</p>
+        </div>
+      </section>
+
+      <section class="themes" id="themes">
+        <div class="section-head">
+          <h2>Ten map themes</h2>
+          <p>Premium looks graded from the same Natural Earth base — pick one mood, or a different one per monitor.</p>
+        </div>
+
+        <div class="theme-stage">
+          <figure class="theme-frame">
+            <img
+              id="theme-preview"
+              src="assets/theme-natural.jpg"
+              alt="Natural Earth map theme preview"
+              width="960"
+              height="540"
+            />
+            <figcaption>
+              <span id="theme-label">Natural</span>
+              <span id="theme-blurb">Classic shaded relief</span>
+            </figcaption>
+          </figure>
+
+          <div class="theme-rail" role="listbox" aria-label="Map themes" id="theme-rail">
+            <!-- filled by main.js -->
+          </div>
+        </div>
+
+        <div class="shot-row" aria-label="Desktop previews">
+          <figure>
+            <img src="assets/shot-desktop-natural.jpg" alt="Orblune desktop with Natural theme and city time cards" width="960" height="540" loading="lazy" />
+            <figcaption>Natural</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/shot-desktop-aqua.jpg" alt="Orblune desktop with Sea glass theme" width="960" height="540" loading="lazy" />
+            <figcaption>Sea glass</figcaption>
+          </figure>
+          <figure>
+            <img src="assets/shot-desktop-ember.jpg" alt="Orblune desktop with Ember theme" width="960" height="540" loading="lazy" />
+            <figcaption>Ember</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="features" id="features">
+        <div class="section-head">
+          <h2>Built to stay out of the way</h2>
+          <p>Wallpaper that updates with the sun — not another noisy widget layer.</p>
+        </div>
+        <ul class="feature-list">
+          <li>
+            <h3>Day and night</h3>
+            <p>Terminator follows the real sun. City lights bloom after dusk.</p>
+          </li>
+          <li>
+            <h3>Times that pin</h3>
+            <p>Home city plus world clocks, locked to the map — not floating chrome.</p>
+          </li>
+          <li>
+            <h3>Weather, quietly</h3>
+            <p>MET Norway forecasts on the cards that matter. Refresh without layout jump.</p>
+          </li>
+          <li>
+            <h3>Multi-monitor</h3>
+            <p>Enable displays independently. Premium can set a theme per screen.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="download" id="download">
+        <div class="download-panel">
+          <p class="brand-mark soft">Orblune</p>
+          <h2>Install in one click</h2>
+          <p>Grab the latest setup, double-click, and find Orblune in the system tray.</p>
+          <div class="cta-row">
+            <a class="btn primary" id="download-btn-2" href="https://github.com/CByBB/Orblune/releases/latest">
+              Download for Windows
+            </a>
+            <a class="btn ghost" href="https://github.com/CByBB/Orblune/releases">All releases</a>
+          </div>
+          <p class="fine">Free tier included · Premium is a one-time unlock</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-brand">
+        <img src="assets/orblune.svg" width="22" height="22" alt="" />
+        <span>Orblune</span>
+      </div>
+      <p>
+        Weather ©
+        <a href="https://www.met.no/en/free-meteorological-data/Licensing-and-crediting" rel="noopener">MET Norway</a>.
+        Earth day map by Tom Patterson · night lights NASA Black Marble.
+      </p>
+      <p class="foot-links">
+        <a href="https://github.com/CByBB/Orblune">Source</a>
+        <a href="https://github.com/CByBB/Orblune/releases/latest">Latest release</a>
+      </p>
+    </footer>
+
+    <script src="main.js" defer></script>
+  </body>
+</html>
