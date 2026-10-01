@@ -791,7 +791,7 @@ a {
 }
 
 @media (max-width: 640px) {
-  .nav a:not(.nav-cta):not([href*="issues"]) {
+  .nav a:not(.nav-cta) {
     display: none;
   }
 
