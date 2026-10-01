@@ -146,8 +146,8 @@ function watchScroll() {
     requestAnimationFrame(() => {
       const y = window.scrollY;
       topBar?.classList.toggle("scrolled", y > 12);
-      if (heroShot && !reduceMotion) {
-        heroShot.style.transform = `scale(1.08) translate3d(0, ${Math.min(y * 0.18, 120)}px, 0)`;
+      if (heroVisual && !reduceMotion) {
+        heroVisual.style.transform = `translate3d(0, ${Math.min(y * 0.22, 140)}px, 0)`;
       }
       ticking = false;
     });
