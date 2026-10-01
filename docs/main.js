@@ -27,6 +27,79 @@ let frontIsA = true;
 let autoTimer = 0;
 let userPausedUntil = 0;
 
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function splitLetters(el) {
+  const text = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+  el.textContent = "";
+  el.setAttribute("aria-label", text);
+  const letters = [];
+  const words = text.split(" ");
+
+  words.forEach((word, wi) => {
+    const wordSpan = document.createElement("span");
+    wordSpan.className = "word";
+    wordSpan.style.display = "inline-block";
+    wordSpan.style.whiteSpace = "nowrap";
+
+    for (const ch of word) {
+      const span = document.createElement("span");
+      span.className = "letter";
+      span.textContent = ch;
+      span.setAttribute("aria-hidden", "true");
+      wordSpan.appendChild(span);
+      letters.push(span);
+    }
+
+    el.appendChild(wordSpan);
+    if (wi < words.length - 1) {
+      const space = document.createElement("span");
+      space.className = "letter is-space";
+      space.textContent = "\u00a0";
+      space.setAttribute("aria-hidden", "true");
+      el.appendChild(space);
+    }
+  });
+
+  return letters;
+}
+
+function animateHeroLetters() {
+  const targets = Array.from(document.querySelectorAll("[data-letters]"));
+  const after = Array.from(document.querySelectorAll("[data-after-letters]"));
+
+  if (reduceMotion) {
+    for (const el of after) el.classList.add("is-in");
+    return;
+  }
+
+  const allLetters = [];
+  for (const el of targets) {
+    allLetters.push(...splitLetters(el));
+  }
+
+  const order = shuffle(allLetters);
+  const spanMs = 2200;
+  const durationPad = 1200;
+
+  for (const letter of order) {
+    const delay = Math.random() * spanMs;
+    window.setTimeout(() => letter.classList.add("is-in"), delay);
+  }
+
+  const doneAt = spanMs + durationPad;
+  window.setTimeout(() => {
+    for (const el of after) el.classList.add("is-in");
+  }, doneAt * 0.72);
+}
+
 function frontLayer() {
   return frontIsA ? layerA : layerB;
 }
@@ -50,7 +123,7 @@ function selectTheme(theme, button, { fromAuto = false } = {}) {
   }
 
   back.src = nextSrc;
-  back.alt = `${theme.label} map theme preview`;
+  back.alt = `${theme.label} map theme preview in Orblune`;
   back.onload = () => {
     back.classList.add("is-front");
     front.classList.remove("is-front");
@@ -147,7 +220,7 @@ function watchScroll() {
       const y = window.scrollY;
       topBar?.classList.toggle("scrolled", y > 12);
       if (heroVisual && !reduceMotion) {
-        heroVisual.style.transform = `translate3d(0, ${Math.min(y * 0.22, 140)}px, 0)`;
+        heroVisual.style.transform = `translate3d(0, ${Math.min(y * 0.18, 120)}px, 0)`;
       }
       ticking = false;
     });
@@ -179,6 +252,7 @@ function styleCaptionFade() {
   blurbEl.style.transition = "opacity 0.28s ease";
 }
 
+animateHeroLetters();
 buildThemeRail();
 styleCaptionFade();
 resolveLatestInstaller();

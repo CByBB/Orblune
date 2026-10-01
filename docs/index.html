@@ -3,19 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Orblune — Live Earth wallpaper for Windows</title>
+    <title>Orblune — Live Earth Wallpaper for Windows with World Clocks &amp; Weather</title>
     <meta
       name="description"
-      content="Orblune turns your Windows desktop into a live Earth map with real day and night lighting, local city times, and weather."
+      content="Download Orblune, the live Earth wallpaper for Windows 10 and 11. Real day and night lighting, city times, weather pins, multi-monitor themes, and a calm desktop globe."
     />
-    <meta property="og:title" content="Orblune — Live Earth wallpaper" />
+    <meta
+      name="keywords"
+      content="Orblune, live Earth wallpaper, Windows wallpaper, world clock wallpaper, desktop globe, day night map, weather wallpaper, multi monitor wallpaper"
+    />
+    <meta name="author" content="Orblune" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://cbybb.github.io/Orblune/" />
+
+    <meta property="og:site_name" content="Orblune" />
+    <meta property="og:title" content="Orblune — Live Earth wallpaper for Windows" />
     <meta
       property="og:description"
-      content="A calm, live Earth behind your icons — times and weather for cities that matter."
+      content="Real sun lighting, world city times, and weather on a quiet live Earth wallpaper for Windows."
     />
     <meta property="og:image" content="https://cbybb.github.io/Orblune/assets/og-cover.jpg" />
+    <meta property="og:image:alt" content="Orblune Earth wallpaper with live city time and weather cards" />
     <meta property="og:url" content="https://cbybb.github.io/Orblune/" />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Orblune — Live Earth wallpaper for Windows" />
+    <meta
+      name="twitter:description"
+      content="Download Orblune for a live Earth desktop with real day/night, clocks, and weather."
+    />
+    <meta name="twitter:image" content="https://cbybb.github.io/Orblune/assets/og-cover.jpg" />
+
     <meta name="theme-color" content="#03060c" />
     <link rel="icon" type="image/png" href="assets/favicon.png" />
     <link rel="apple-touch-icon" href="assets/icon-192.png" />
@@ -26,6 +46,31 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Orblune",
+        "applicationCategory": "DesktopEnhancementApplication",
+        "operatingSystem": "Windows 10, Windows 11",
+        "url": "https://cbybb.github.io/Orblune/",
+        "downloadUrl": "https://github.com/CByBB/Orblune/releases/latest",
+        "image": "https://cbybb.github.io/Orblune/assets/og-cover.jpg",
+        "description": "Live Earth wallpaper for Windows with real day and night lighting, world city times, weather, and multi-monitor themes.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free tier available; Premium is a one-time unlock"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "Orblune",
+          "url": "https://github.com/CByBB/Orblune"
+        }
+      }
+    </script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
@@ -45,36 +90,34 @@
     </header>
 
     <main id="main">
-      <section class="hero" id="top">
+      <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero-visual" aria-hidden="true">
           <img
-            class="hero-shot"
-            src="assets/shot-desktop-natural.jpg"
-            alt=""
-            width="1920"
-            height="1080"
+            class="hero-map"
+            src="assets/hero-map.jpg"
+            alt="Orblune live Earth wallpaper with time and weather cards for London, New York, Tokyo, Dubai, Sydney, and San Francisco"
+            width="2560"
+            height="1280"
             fetchpriority="high"
+            decoding="async"
           />
           <div class="hero-scrim"></div>
           <div class="hero-glow"></div>
         </div>
         <div class="hero-copy">
-          <p class="brand-mark" data-rise>Orblune</p>
-          <h1 data-rise style="--d: 80ms">Earth, live behind your icons.</h1>
-          <p class="lede" data-rise style="--d: 160ms">
+          <p class="brand-mark" data-letters>Orblune</p>
+          <h1 id="hero-title" data-letters>Earth, live behind your icons.</h1>
+          <p class="lede" data-letters>
             Real sun lighting, city times, and weather on a quiet Windows wallpaper.
           </p>
-          <div class="cta-row" data-rise style="--d: 240ms">
+          <div class="cta-row" data-after-letters>
             <a class="btn primary" id="download-btn" href="https://github.com/CByBB/Orblune/releases/latest">
               Download for Windows
             </a>
             <a class="btn ghost" href="https://github.com/CByBB/Orblune">GitHub</a>
           </div>
-          <p class="fine" data-rise style="--d: 320ms">Windows 10 &amp; 11 · current-user install · no admin</p>
+          <p class="fine" data-after-letters>Windows 10 &amp; 11 · current-user install · no admin</p>
         </div>
-        <a class="scroll-cue" href="#themes" aria-label="Browse themes">
-          <span></span>
-        </a>
       </section>
 
       <section class="themes" id="themes">
@@ -91,7 +134,7 @@
                 id="theme-preview-a"
                 class="theme-layer is-front"
                 src="assets/theme-natural.jpg"
-                alt="Natural Earth map theme preview"
+                alt="Natural Earth map theme preview in Orblune"
                 width="960"
                 height="540"
               />
@@ -116,15 +159,33 @@
 
         <div class="shot-row" aria-label="Desktop previews">
           <figure class="shot-card" style="--i: 0">
-            <img src="assets/shot-desktop-natural.jpg" alt="Orblune desktop with Natural theme and city time cards" width="960" height="540" loading="lazy" />
+            <img
+              src="assets/shot-desktop-natural.jpg"
+              alt="Orblune live Earth wallpaper on Windows showing Natural theme with city time and weather cards"
+              width="960"
+              height="540"
+              loading="lazy"
+            />
             <figcaption>Natural</figcaption>
           </figure>
           <figure class="shot-card" style="--i: 1">
-            <img src="assets/shot-desktop-aqua.jpg" alt="Orblune desktop with Sea glass theme" width="960" height="540" loading="lazy" />
+            <img
+              src="assets/shot-desktop-aqua.jpg"
+              alt="Orblune Sea glass theme desktop wallpaper with world clocks"
+              width="960"
+              height="540"
+              loading="lazy"
+            />
             <figcaption>Sea glass</figcaption>
           </figure>
           <figure class="shot-card" style="--i: 2">
-            <img src="assets/shot-desktop-ember.jpg" alt="Orblune desktop with Ember theme" width="960" height="540" loading="lazy" />
+            <img
+              src="assets/shot-desktop-ember.jpg"
+              alt="Orblune Ember theme desktop wallpaper with dusk lighting"
+              width="960"
+              height="540"
+              loading="lazy"
+            />
             <figcaption>Ember</figcaption>
           </figure>
         </div>
