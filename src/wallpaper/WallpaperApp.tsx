@@ -9,6 +9,7 @@ import {
   getDisplaySettings,
   loadSettings,
   resolveMapThemeForDisplay,
+  SETTINGS_STORE_READY_EVENT,
   type AppSettings,
   type MonitorInfo,
 } from "../lib/store";
@@ -20,6 +21,28 @@ function wallpaperIndexFromLabel(label: string): number {
   return m ? Number(m[1]) : 0;
 }
 
+/** Let the settings window open the store first; fall back if it never signals. */
+function waitForSettingsStore(timeoutMs = 2000): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let unlisten: (() => void) | undefined;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      unlisten?.();
+      resolve();
+    };
+
+    const timer = window.setTimeout(finish, timeoutMs);
+    void listen(SETTINGS_STORE_READY_EVENT, finish).then((fn) => {
+      unlisten = fn;
+      if (settled) fn();
+    });
+  });
+}
+
 export function WallpaperApp() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
@@ -29,7 +52,18 @@ export function WallpaperApp() {
 
   useEffect(() => {
     let cancelled = false;
+    let pollId = 0;
+
     (async () => {
+      // Primary wallpaper yields so settings can open the store without racing.
+      if (label === "wallpaper") {
+        await waitForSettingsStore(5000);
+      } else {
+        // Secondary windows are created after attach; a short yield is enough.
+        await new Promise((r) => window.setTimeout(r, 100));
+      }
+      if (cancelled) return;
+
       const [s, list] = await Promise.all([
         loadSettings(),
         invoke<MonitorInfo[]>("wallpaper_list_monitors").catch(() => [] as MonitorInfo[]),
@@ -49,34 +83,33 @@ export function WallpaperApp() {
       } catch (e) {
         console.warn("wallpaper attach", e);
       }
+
+      pollId = window.setInterval(async () => {
+        const [next, nextList] = await Promise.all([
+          loadSettings(),
+          invoke<MonitorInfo[]>("wallpaper_list_monitors").catch(() => null),
+        ]);
+        setSettings((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
+          return next;
+        });
+        if (nextList) {
+          setMonitors((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(nextList)) return prev;
+            return nextList;
+          });
+        }
+      }, 2000);
     })();
 
     const unlisten = listen<AppSettings>("settings-updated", (event) => {
       setSettings(event.payload);
     });
 
-    // Poll settings as fallback when events are unavailable
-    const id = window.setInterval(async () => {
-      const [s, list] = await Promise.all([
-        loadSettings(),
-        invoke<MonitorInfo[]>("wallpaper_list_monitors").catch(() => null),
-      ]);
-      setSettings((prev) => {
-        if (JSON.stringify(prev) === JSON.stringify(s)) return prev;
-        return s;
-      });
-      if (list) {
-        setMonitors((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(list)) return prev;
-          return list;
-        });
-      }
-    }, 500);
-
     return () => {
       cancelled = true;
       void unlisten.then((fn) => fn());
-      clearInterval(id);
+      if (pollId) clearInterval(pollId);
     };
   }, [label]);
 

@@ -10,11 +10,12 @@ use windows::Win32::Graphics::Gdi::{
     EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, MONITORINFOEXW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, FindWindowExW, FindWindowW, GetSystemMetrics, GetWindow, GetWindowLongPtrW,
-    GetWindowRect, SendMessageTimeoutW, SetParent, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE,
-    GW_CHILD, GW_HWNDNEXT, HWND_BOTTOM, SMTO_NORMAL, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
-    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_NOACTIVATE, SWP_NOZORDER, SWP_SHOWWINDOW,
-    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+    EnumWindows, FindWindowExW, FindWindowW, GetParent, GetSystemMetrics, GetWindow,
+    GetWindowLongPtrW, GetWindowRect, SendMessageTimeoutW, SetParent, SetWindowLongPtrW,
+    SetWindowPos, GWL_EXSTYLE, GW_CHILD, GW_HWNDNEXT, HWND_BOTTOM, SMTO_NORMAL,
+    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_NOACTIVATE,
+    SWP_NOZORDER, SWP_SHOWWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    WS_EX_TRANSPARENT,
 };
 
 static ATTACHED: AtomicBool = AtomicBool::new(false);
@@ -258,7 +259,8 @@ fn ensure_wallpaper_window(app: &AppHandle, index: usize) -> Result<WebviewWindo
     WebviewWindowBuilder::new(app, &label, WebviewUrl::App("wallpaper.html".into()))
         .title(format!("Orblune Wallpaper {index}"))
         .decorations(false)
-        .transparent(true)
+        // Opaque host: acrylic taskbars flicker less than with a transparent layered window.
+        .transparent(false)
         .skip_taskbar(true)
         .visible(false)
         .resizable(false)
@@ -290,12 +292,38 @@ fn prune_extra_windows(app: &AppHandle, keep: usize) {
     }
 }
 
-fn attach_window_to_monitor(window: &WebviewWindow, monitor: &MonitorRect) -> Result<(), String> {
+fn window_needs_reattach(hwnd: HWND, worker: HWND, monitor: &MonitorRect) -> bool {
+    unsafe {
+        let parent = GetParent(hwnd).unwrap_or_default();
+        if parent != worker {
+            return true;
+        }
+        let mut rect = RECT::default();
+        if GetWindowRect(hwnd, &mut rect).is_err() {
+            return true;
+        }
+        let w = rect.right - rect.left;
+        let h = rect.bottom - rect.top;
+        rect.left != monitor.x || rect.top != monitor.y || w != monitor.w || h != monitor.h
+    }
+}
+
+fn attach_window_to_monitor(
+    window: &WebviewWindow,
+    monitor: &MonitorRect,
+    force: bool,
+) -> Result<(), String> {
     let hwnd = HWND(window.hwnd().map_err(|e| e.to_string())?.0 as *mut _);
 
     let worker = find_worker_w().ok_or_else(|| {
         "Could not find the desktop WorkerW window. Explorer may still be starting.".to_string()
     })?;
+
+    // Skip SetParent/SetWindowPos when already correctly hosted — avoids acrylic taskbar flicker.
+    if !force && !window_needs_reattach(hwnd, worker, monitor) {
+        let _ = window.set_ignore_cursor_events(true);
+        return Ok(());
+    }
 
     unsafe {
         prepare_window_styles(hwnd);
@@ -368,7 +396,11 @@ fn monitor_is_enabled(monitor: &MonitorRect, filter: &Option<Vec<String>>) -> bo
     }
 }
 
-pub fn attach_all(app: &AppHandle, enabled_keys: Option<Vec<String>>) -> Result<(), String> {
+pub fn attach_all(
+    app: &AppHandle,
+    enabled_keys: Option<Vec<String>>,
+    force: bool,
+) -> Result<(), String> {
     let _guard = ATTACH_LOCK
         .lock()
         .map_err(|_| "Wallpaper attach lock poisoned".to_string())?;
@@ -388,7 +420,7 @@ pub fn attach_all(app: &AppHandle, enabled_keys: Option<Vec<String>>) -> Result<
         let enabled = monitor_is_enabled(monitor, &filter);
         if enabled {
             let window = ensure_wallpaper_window(app, index)?;
-            attach_window_to_monitor(&window, monitor)?;
+            attach_window_to_monitor(&window, monitor, force)?;
             any = true;
         } else if let Some(window) = app.get_webview_window(&wallpaper_label(index)) {
             let _ = detach_window(&window);
@@ -399,13 +431,8 @@ pub fn attach_all(app: &AppHandle, enabled_keys: Option<Vec<String>>) -> Result<
     }
 
     ATTACHED.store(any, Ordering::SeqCst);
-    if any {
-        clear_error();
-        Ok(())
-    } else {
-        clear_error();
-        Ok(())
-    }
+    clear_error();
+    Ok(())
 }
 
 pub fn detach_all(app: &AppHandle) -> Result<(), String> {
@@ -468,7 +495,7 @@ pub fn wallpaper_attach(
     app: AppHandle,
     enabled_keys: Option<Vec<String>>,
 ) -> Result<WallpaperStatus, String> {
-    match attach_all(&app, enabled_keys) {
+    match attach_all(&app, enabled_keys, true) {
         Ok(()) => Ok(status(&app)),
         Err(e) => {
             set_error(e.clone());
@@ -497,11 +524,12 @@ pub fn wallpaper_primary_bounds(app: AppHandle) -> Result<(i32, i32, i32, i32), 
 
 pub fn spawn_reattach_loop(app: AppHandle) {
     std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_secs(8));
+        // Slow health check only — avoid periodic SetParent (acrylic taskbar flicker).
+        std::thread::sleep(std::time::Duration::from_secs(30));
         if !ATTACHED.load(Ordering::SeqCst) {
             continue;
         }
-        if let Err(e) = attach_all(&app, None) {
+        if let Err(e) = attach_all(&app, None, false) {
             set_error(e);
         }
     });

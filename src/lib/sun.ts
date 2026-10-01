@@ -46,22 +46,30 @@ export function formatLocalTime(
   date: Date,
   timeZone: string,
   hour12: boolean,
+  showSeconds = false,
 ): string {
   try {
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone,
       hour: "2-digit",
       minute: "2-digit",
+      second: showSeconds ? "2-digit" : undefined,
       hour12,
       hourCycle: hour12 ? "h12" : "h23",
     }).formatToParts(date);
     const get = (type: Intl.DateTimeFormatPartTypes) =>
       parts.find((p) => p.type === type)?.value ?? "";
-    const time = `${get("hour")}:${get("minute")}`;
+    const time = showSeconds
+      ? `${get("hour")}:${get("minute")}:${get("second")}`
+      : `${get("hour")}:${get("minute")}`;
     const dayPeriod = get("dayPeriod");
     return dayPeriod ? `${time} ${dayPeriod.toUpperCase()}` : time;
   } catch {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: showSeconds ? "2-digit" : undefined,
+    });
   }
 }
 

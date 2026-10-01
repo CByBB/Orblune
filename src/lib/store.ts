@@ -23,6 +23,7 @@ export type AppSettings = {
   enabledCityIds: string[];
   tempUnit: TempUnit;
   hour12: boolean;
+  showSeconds: boolean;
   labelSize: LabelSize;
   mapTheme: MapThemeId;
   /** Per-monitor overrides keyed by Windows device string (e.g. \\\\.\\DISPLAY1). */
@@ -55,6 +56,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enabledCityIds: defaultEnabledCityIds(),
   tempUnit: "C",
   hour12: false,
+  showSeconds: false,
   labelSize: "medium",
   mapTheme: DEFAULT_MAP_THEME,
   displaySettings: {},
@@ -127,11 +129,40 @@ export function resolveMapThemeForDisplay(
   return settings.mapTheme ?? DEFAULT_MAP_THEME;
 }
 
+/** Fired by the settings window after the first store open attempt finishes. */
+export const SETTINGS_STORE_READY_EVENT = "settings-store-ready";
+
+const STORE_TIMEOUT_MS = 4000;
+
 let storePromise: Promise<Store> | null = null;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = window.setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(id);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(id);
+        reject(error);
+      },
+    );
+  });
+}
 
 async function getStore(): Promise<Store> {
   if (!storePromise) {
-    storePromise = Store.load("orblune-settings.json");
+    storePromise = withTimeout(
+      Store.load("orblune-settings.json"),
+      STORE_TIMEOUT_MS,
+      "Store.load",
+    ).catch((error) => {
+      // Allow a later retry instead of poisoning the shared promise forever.
+      storePromise = null;
+      throw error;
+    });
   }
   return storePromise;
 }
@@ -139,7 +170,12 @@ async function getStore(): Promise<Store> {
 export async function loadSettings(): Promise<AppSettings> {
   try {
     const store = await getStore();
-    const raw = (await store.get<Record<string, unknown>>("settings")) ?? {};
+    const raw =
+      (await withTimeout(
+        store.get<Record<string, unknown>>("settings"),
+        STORE_TIMEOUT_MS,
+        "Store.get",
+      )) ?? {};
     const merged: AppSettings = {
       ...DEFAULT_SETTINGS,
       ...(raw as Partial<AppSettings>),
@@ -155,8 +191,8 @@ export async function loadSettings(): Promise<AppSettings> {
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
   const store = await getStore();
-  await store.set("settings", settings);
-  await store.save();
+  await withTimeout(store.set("settings", settings), STORE_TIMEOUT_MS, "Store.set");
+  await withTimeout(store.save(), STORE_TIMEOUT_MS, "Store.save");
 }
 
 export function canEnableCity(

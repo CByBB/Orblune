@@ -57,7 +57,7 @@ pub fn run() {
                         if wallpaper::status(app).attached {
                             let _ = wallpaper::detach_all(app);
                         } else {
-                            let _ = wallpaper::attach_all(app, None);
+                            let _ = wallpaper::attach_all(app, None, true);
                         }
                     }
                     "quit" => {

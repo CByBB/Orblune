@@ -41,8 +41,11 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 0;
-  min-width: 0;
-  padding: 10px 14px 11px;
+  box-sizing: border-box;
+  width: 176px;
+  min-width: 176px;
+  max-width: 176px;
+  padding: 12px 14px 12px;
   border-radius: 2px;
   background: rgba(4, 10, 16, 0.78);
   border: 1px solid rgba(220, 235, 245, 0.16);
@@ -84,7 +87,9 @@
     0 0 12px rgba(160, 210, 230, 0.55);
 }
 
-.city-label.home .city-label-inner {
+.city-label.home {
+  z-index: 3;
+}
   border-color: rgba(143, 214, 234, 0.45);
   background: rgba(6, 16, 26, 0.86);
   box-shadow:
@@ -108,10 +113,10 @@
 }
 
 .city-time {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  line-height: 1;
+  line-height: 1.1;
   color: #f7fafc;
   font-variant-numeric: tabular-nums;
 }
@@ -119,25 +124,32 @@
 .city-meta {
   display: flex;
   align-items: baseline;
-  gap: 7px;
-  margin-top: 7px;
-  padding-top: 7px;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid rgba(220, 235, 245, 0.12);
   width: 100%;
+  min-width: 0;
 }
 
 .city-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: rgba(230, 240, 248, 0.88);
 }
 
 .city-tz {
+  flex-shrink: 0;
   font-size: 9px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(160, 190, 210, 0.65);
 }
@@ -146,7 +158,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -165,7 +177,7 @@
 }
 
 .map-labels[data-label-size="small"] .city-label-inner {
-  padding: 7px 10px 8px;
+  padding: 9px 11px 9px;
   transform: scale(0.84);
   transform-origin: 50% 100%;
 }
@@ -175,9 +187,9 @@
 }
 
 .map-labels[data-label-size="small"] .city-meta {
-  margin-top: 5px;
-  padding-top: 5px;
-  gap: 5px;
+  margin-top: 6px;
+  padding-top: 6px;
+  gap: 6px;
 }
 
 .map-labels[data-label-size="small"] .city-name {
@@ -189,7 +201,7 @@
 }
 
 .map-labels[data-label-size="small"] .city-weather {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 11px;
 }
 
@@ -199,7 +211,7 @@
 }
 
 .map-labels[data-label-size="large"] .city-label-inner {
-  padding: 12px 16px 13px;
+  padding: 14px 16px 14px;
   transform: scale(1.16);
   transform-origin: 50% 100%;
 }
@@ -209,8 +221,8 @@
 }
 
 .map-labels[data-label-size="large"] .city-meta {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 9px;
+  padding-top: 9px;
   gap: 8px;
 }
 
@@ -223,7 +235,7 @@
 }
 
 .map-labels[data-label-size="large"] .city-weather {
-  margin-top: 7px;
+  margin-top: 9px;
   font-size: 13px;
 }
 
@@ -237,7 +249,10 @@
 }
 
 .globe-preview .city-label-inner {
-  padding: 8px 11px 9px;
+  width: 156px;
+  min-width: 156px;
+  max-width: 156px;
+  padding: 9px 11px 9px;
 }
 
 .globe-preview .city-label-inner::after {
@@ -250,8 +265,8 @@
 }
 
 .globe-preview .city-meta {
-  margin-top: 5px;
-  padding-top: 5px;
+  margin-top: 6px;
+  padding-top: 6px;
   gap: 6px;
 }
 
@@ -264,7 +279,7 @@
 }
 
 .globe-preview .city-weather {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 11px;
 }
 

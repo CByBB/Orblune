@@ -15,6 +15,7 @@ import {
   getDisplaySettings,
   loadSettings,
   saveSettings,
+  SETTINGS_STORE_READY_EVENT,
   type AppSettings,
   type MonitorInfo,
   DEFAULT_SETTINGS,
@@ -60,6 +61,9 @@ export function SettingsApp() {
 
   useEffect(() => {
     let statusPoll = 0;
+    let cancelled = false;
+    // Never block the shell on store/IPC — defaults first, hydrate when ready.
+    setLoaded(true);
     (async () => {
       try {
         setAppVersion(await getVersion());
@@ -67,9 +71,14 @@ export function SettingsApp() {
         setAppVersion("dev");
       }
       const s = await loadSettings();
+      if (cancelled) return;
       setSettings(s);
-      setLoaded(true);
       if (!s.onboardingDone) setTab("location");
+      try {
+        await emit(SETTINGS_STORE_READY_EVENT);
+      } catch {
+        /* ok */
+      }
       try {
         setAutostartOn(await isEnabled());
       } catch {
@@ -77,24 +86,29 @@ export function SettingsApp() {
       }
       try {
         const st = await invoke<WallpaperUiStatus>("wallpaper_status");
-        setStatus(st);
+        if (!cancelled) setStatus(st);
       } catch {
         /* ignore */
       }
-      await refreshMonitors();
+      if (!cancelled) await refreshMonitors();
       statusPoll = window.setInterval(() => {
         void refreshStatus();
         void refreshMonitors();
       }, 4000);
     })();
     return () => {
+      cancelled = true;
       if (statusPoll) clearInterval(statusPoll);
     };
   }, []);
 
   async function persist(next: AppSettings) {
     setSettings(next);
-    await saveSettings(next);
+    try {
+      await saveSettings(next);
+    } catch (e) {
+      console.warn("saveSettings", e);
+    }
     try {
       await emit("settings-updated", next);
       const wins = await getAllWebviewWindows();
@@ -591,6 +605,20 @@ export function SettingsApp() {
                     ]}
                     onChange={(v) => void persist({ ...settings, hour12: v === "12" })}
                   />
+                </label>
+                <label className="row">
+                  <span>Show seconds</span>
+                  <span className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={settings.showSeconds}
+                      disabled={!settings.premium}
+                      onChange={(e) =>
+                        void persist({ ...settings, showSeconds: e.target.checked })
+                      }
+                    />
+                    <span className="toggle-track" />
+                  </span>
                 </label>
                 <label className="row">
                   <span>Default map theme</span>

@@ -72,6 +72,20 @@ function loadTexture(url: string, anisotropy: number): Promise<THREE.Texture> {
 /** Equirectangular map aspect (width / height). */
 const MAP_ASPECT = 2;
 
+/** Live-loop targets: wallpaper stays light; settings preview stays a bit snappier. */
+function loopConfig(preview: boolean) {
+  return {
+    renderFps: preview ? 30 : 12,
+    /** How often we check whether HH:MM text should change (clocks have no seconds). */
+    labelCheckMs: preview ? 1000 : 2000,
+    settingsPollMs: preview ? 600 : 1000,
+    maxDpr: preview ? 2 : 1.5,
+    antialias: preview,
+    starCount: preview ? 200 : 400,
+    weatherRefreshMs: 15 * 60 * 1000,
+  };
+}
+
 /** contain = letterbox (preview); cover = fill without stretch (wallpaper). */
 function fitMapRect(
   viewW: number,
@@ -125,12 +139,14 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     const weatherCache = new Map<string, WeatherSnapshot | null>();
     let raf = 0;
     let poll = 0;
+    let weatherPoll = 0;
     let ro: ResizeObserver | null = null;
     let dayTex: THREE.Texture | null = null;
     let nightTex: THREE.Texture | null = null;
     let cloudTex: THREE.Texture | null = null;
     let mapMat: THREE.ShaderMaterial | null = null;
     let mapRect = { x: 0, y: 0, w: 1, h: 1 };
+    const cfg = loopConfig(preview);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x03060c);
@@ -139,9 +155,13 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     camera.position.set(0, 0, 2);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: cfg.antialias,
+      alpha: false,
+      powerPreference: preview ? "default" : "low-power",
+    });
     renderer.setClearColor(0x03060c, 1);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.maxDpr));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.className = "map-stage";
     root.appendChild(renderer.domElement);
@@ -160,7 +180,7 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
 
     // Soft starfield behind letterbox bars
     {
-      const count = preview ? 200 : 600;
+      const count = cfg.starCount;
       const positions = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
         positions[i * 3] = (Math.random() - 0.5) * 8;
@@ -180,6 +200,7 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     function syncCameraToViewport() {
       const viewW = Math.max(1, root.clientWidth);
       const viewH = Math.max(1, root.clientHeight);
+      // Wallpaper and preview both fill the view; camera crops the 2:1 map to match.
       mapRect = fitMapRect(viewW, viewH, "cover");
       renderer.setSize(viewW, viewH, false);
 
@@ -203,6 +224,9 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       labelLayer.style.top = `${mapRect.y}px`;
       labelLayer.style.width = `${mapRect.w}px`;
       labelLayer.style.height = `${mapRect.h}px`;
+
+      // Re-project after frustum/layer size changes so pins stay on cities.
+      layoutLabelsExact();
     }
 
     function buildMarkers(s: AppSettings): MarkerData[] {
@@ -240,8 +264,9 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     }
 
     function updateLabelContent(el: HTMLElement, m: MarkerData, s: AppSettings, now: Date) {
+      const showSeconds = Boolean(s.premium && s.showSeconds);
       const timeEl = el.querySelector(".city-time");
-      if (timeEl) timeEl.textContent = formatLocalTime(now, m.timezone, s.hour12);
+      if (timeEl) timeEl.textContent = formatLocalTime(now, m.timezone, s.hour12, showSeconds);
       const nameEl = el.querySelector(".city-name");
       if (nameEl) nameEl.textContent = m.name;
       const tzEl = el.querySelector(".city-tz");
@@ -257,15 +282,21 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     }
 
     function placeLabel(el: HTMLElement, lat: number, lon: number) {
+      el.dataset.lat = String(lat);
+      el.dataset.lon = String(lon);
       const { u, v } = latLonToMapUV(lat, lon);
 
       const x = u * 2 - 1;
       const y = 0.5 - v;
-      const nx = (x - camera.left) / (camera.right - camera.left);
-      const ny = (camera.top - y) / (camera.top - camera.bottom);
+      const spanX = camera.right - camera.left;
+      const spanY = camera.top - camera.bottom;
+      if (spanX === 0 || spanY === 0) return;
+
+      const nx = (x - camera.left) / spanX;
+      const ny = (camera.top - y) / spanY;
       const left = nx * 100;
       const top = ny * 100;
-      const onScreen = nx >= -0.05 && nx <= 1.05 && ny >= -0.08 && ny <= 1.1;
+      const onScreen = nx >= -0.02 && nx <= 1.02 && ny >= -0.05 && ny <= 1.05;
 
       el.dataset.baseLeft = String(left);
       el.dataset.baseTop = String(top);
@@ -276,73 +307,25 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       el.style.visibility = onScreen ? "visible" : "hidden";
     }
 
-    /** Nudge overlapping labels apart (esp. East Asia cluster). */
-    function resolveLabelCollisions() {
-      const nodes = Array.from(labelLayer.querySelectorAll(".city-label")).filter(
-        (n): n is HTMLElement => n instanceof HTMLElement,
-      );
-      if (nodes.length < 2) return;
-
-      const layerW = labelLayer.clientWidth || 1;
-      const layerH = labelLayer.clientHeight || 1;
-      type Item = { el: HTMLElement; x: number; y: number; w: number; h: number; home: boolean };
-      const items: Item[] = nodes.map((el) => {
-        const left = Number(el.dataset.baseLeft ?? "0");
-        const top = Number(el.dataset.baseTop ?? "0");
-        const rect = el.getBoundingClientRect();
-        const w = Math.max(rect.width, preview ? 88 : 110);
-        const h = Math.max(rect.height, preview ? 42 : 52);
-        return {
-          el,
-          x: (left / 100) * layerW,
-          y: (top / 100) * layerH,
-          w,
-          h,
-          home: el.classList.contains("home"),
-        };
-      });
-
-      // Home stays put; others yield
-      items.sort((a, b) => Number(b.home) - Number(a.home) || a.x - b.x);
-
-      const padX = preview ? 8 : 10;
-      const padY = preview ? 6 : 8;
-      for (let i = 0; i < items.length; i++) {
-        const a = items[i]!;
-        for (let j = i + 1; j < items.length; j++) {
-          const b = items[j]!;
-          const ax0 = a.x - a.w / 2;
-          const ax1 = a.x + a.w / 2;
-          const ay0 = a.y - a.h - 12;
-          const ay1 = a.y - 4;
-          const bx0 = b.x - b.w / 2;
-          const bx1 = b.x + b.w / 2;
-          const by0 = b.y - b.h - 12;
-          const by1 = b.y - 4;
-          const overlapX = Math.min(ax1, bx1) - Math.max(ax0, bx0);
-          const overlapY = Math.min(ay1, by1) - Math.max(ay0, by0);
-          if (overlapX > -padX && overlapY > -padY) {
-            // Prefer vertical stagger; alternate up/down by index
-            const nudge = (b.h + padY) * (j % 2 === 0 ? -1 : 1);
-            b.y += nudge;
-            // If still too close horizontally in dense Asia band, also shift slightly
-            if (overlapX > b.w * 0.35) {
-              b.x += (j % 2 === 0 ? -1 : 1) * Math.min(28, overlapX * 0.35);
-            }
-          }
-        }
-      }
-
-      for (const it of items) {
-        const left = (it.x / layerW) * 100;
-        const top = (it.y / layerH) * 100;
-        it.el.style.left = `${left}%`;
-        it.el.style.top = `${top}%`;
+    /** Pin every card to its lat/lon — no collision drift. */
+    function layoutLabelsExact() {
+      const markers = buildMarkers(settingsRef.current);
+      for (const node of Array.from(labelLayer.querySelectorAll(".city-label"))) {
+        if (!(node instanceof HTMLElement)) continue;
+        const id = node.dataset.id;
+        const m = id ? markers.find((x) => x.id === id) : undefined;
+        const lat = m?.lat ?? Number(node.dataset.lat);
+        const lon = m?.lon ?? Number(node.dataset.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        placeLabel(node, lat, lon);
       }
     }
 
     function requestWeather(m: MarkerData) {
-      if (!m.showWeather || weatherCache.has(m.id)) return;
+      if (!m.showWeather) return;
+      const cached = weatherCache.get(m.id);
+      if (cached === null) return; // in flight
+      if (cached && cached.expiresAt > Date.now()) return;
       weatherCache.set(m.id, null);
       fetchWeather(m.lat, m.lon).then((w) => {
         if (disposed) return;
@@ -365,28 +348,34 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
         el.innerHTML =
           `<div class="city-label-inner"><span class="city-time"></span><div class="city-meta"><span class="city-name"></span><span class="city-tz"></span></div><span class="city-weather"></span></div>`;
         updateLabelContent(el, m, s, now);
-        placeLabel(el, m.lat, m.lon);
         labelLayer.appendChild(el);
+        placeLabel(el, m.lat, m.lon);
         requestWeather(m);
       }
-      // Defer collision pass until layout sizes exist
-      requestAnimationFrame(() => resolveLabelCollisions());
+      // Second frame: layer size is final after insert.
+      requestAnimationFrame(() => layoutLabelsExact());
     }
 
     const clock = new THREE.Clock();
     let timeAcc = 0;
-    let lastLabelMs = 0;
+    let lastLabelCheckMs = 0;
+    let lastClockBucket = -1;
+    const frameDt = 1 / cfg.renderFps;
 
     const animate = () => {
       raf = requestAnimationFrame(animate);
       if (disposed) return;
       const dt = clock.getDelta();
       timeAcc += dt;
+      if (timeAcc < frameDt) return;
+      timeAcc %= frameDt;
 
       const s = settingsRef.current;
       const sun = subsolarPoint();
+      const showSeconds = Boolean(s.premium && s.showSeconds);
 
       labelLayer.dataset.labelSize = s.labelSize ?? "medium";
+      labelLayer.dataset.showSeconds = showSeconds ? "true" : "false";
 
       if (mapMat) {
         // Rebuild GPU program when shader source rev changes (wallpaper HMR / hot update)
@@ -414,23 +403,30 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
         mapMat.uniforms.themeIndex.value = s.premium ? mapThemeIndex(s.mapTheme ?? "natural") : 0;
       }
 
-      if (timeAcc < 1 / 30) return;
-      timeAcc %= 1 / 30;
-
       const now = new Date();
-      if (now.getTime() - lastLabelMs > 250) {
-        lastLabelMs = now.getTime();
-        const markers = buildMarkers(s);
-        for (const node of Array.from(labelLayer.querySelectorAll(".city-label"))) {
-          if (!(node instanceof HTMLElement)) continue;
-          const id = node.dataset.id;
-          if (!id) continue;
-          const m = markers.find((x) => x.id === id);
-          if (!m) continue;
-          updateLabelContent(node, m, s, now);
-          placeLabel(node, m.lat, m.lon);
+      const checkMs = showSeconds ? 250 : cfg.labelCheckMs;
+      if (now.getTime() - lastLabelCheckMs > checkMs) {
+        lastLabelCheckMs = now.getTime();
+        // HH:MM → update on minute; HH:MM:SS → update on second.
+        const clockBucket = showSeconds
+          ? Math.floor(now.getTime() / 1000)
+          : Math.floor(now.getTime() / 60_000);
+        if (clockBucket !== lastClockBucket) {
+          lastClockBucket = clockBucket;
+          const markers = buildMarkers(s);
+          for (const node of Array.from(labelLayer.querySelectorAll(".city-label"))) {
+            if (!(node instanceof HTMLElement)) continue;
+            const id = node.dataset.id;
+            if (!id) continue;
+            const m = markers.find((x) => x.id === id);
+            if (!m) continue;
+            updateLabelContent(node, m, s, now);
+          }
+          // Keep pins locked to map coords (resize / aspect changes included).
+          if (!showSeconds || clockBucket % 60 === 0) {
+            layoutLabelsExact();
+          }
         }
-        resolveLabelCollisions();
       }
 
       renderer.render(scene, camera);
@@ -453,11 +449,24 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
         lastJson = json;
         rebuildLabels(settingsRef.current);
       }
-    }, 400);
+    }, cfg.settingsPollMs);
+
+    weatherPoll = window.setInterval(() => {
+      for (const m of buildMarkers(settingsRef.current)) {
+        const cached = weatherCache.get(m.id);
+        if (cached && cached.expiresAt <= Date.now()) {
+          weatherCache.delete(m.id);
+        }
+        requestWeather(m);
+      }
+    }, cfg.weatherRefreshMs);
 
     (async () => {
       try {
-        const aniso = renderer.capabilities.getMaxAnisotropy();
+        const aniso = Math.min(
+          renderer.capabilities.getMaxAnisotropy(),
+          preview ? 8 : 4,
+        );
         const [day, night, clouds] = await Promise.all([
           loadTexture("/textures/earth-day.jpg", aniso),
           loadTexture("/textures/earth-night.jpg", aniso),
@@ -508,6 +517,7 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       disposed = true;
       cancelAnimationFrame(raf);
       if (poll) clearInterval(poll);
+      if (weatherPoll) clearInterval(weatherPoll);
       ro?.disconnect();
       mapMatRef.current = null;
       rendererRef.current = null;
