@@ -192,22 +192,42 @@ function startThemeAutoplay() {
 }
 
 async function resolveLatestInstaller() {
-  const fallback = "https://github.com/CByBB/Orblune/releases/latest";
-  const buttons = [document.getElementById("download-btn"), document.getElementById("download-btn-2")].filter(Boolean);
+  const buttons = [document.getElementById("download-btn"), document.getElementById("download-btn-2")].filter(
+    (el) => el instanceof HTMLAnchorElement,
+  );
+
+  function applyDownload(url, filename, tag) {
+    for (const btn of buttons) {
+      btn.href = url;
+      btn.setAttribute("download", filename);
+      btn.setAttribute("rel", "noopener");
+      if (tag) btn.title = `Download Orblune ${tag}`;
+    }
+  }
+
+  // Same-origin cache first (works even if GitHub API is rate-limited).
+  try {
+    const local = await fetch("latest-download.json", { cache: "no-store" });
+    if (local.ok) {
+      const data = await local.json();
+      if (data?.url && data?.name) applyDownload(data.url, data.name, data.tag);
+    }
+  } catch {
+    /* keep HTML href */
+  }
+
+  // Refresh from GitHub API so new releases are picked up automatically.
   try {
     const res = await fetch("https://api.github.com/repos/CByBB/Orblune/releases/latest", {
       headers: { Accept: "application/vnd.github+json" },
     });
-    if (!res.ok) throw new Error("release fetch failed");
+    if (!res.ok) return;
     const data = await res.json();
     const asset = (data.assets || []).find((a) => /Orblune_.*_x64-setup\.exe$/i.test(a.name));
-    const href = asset?.browser_download_url || data.html_url || fallback;
-    for (const btn of buttons) {
-      btn.setAttribute("href", href);
-      if (data.tag_name) btn.setAttribute("title", `Download Orblune ${data.tag_name}`);
-    }
+    if (!asset?.browser_download_url) return;
+    applyDownload(asset.browser_download_url, asset.name, data.tag_name);
   } catch {
-    for (const btn of buttons) btn.setAttribute("href", fallback);
+    /* keep cached / HTML href */
   }
 }
 

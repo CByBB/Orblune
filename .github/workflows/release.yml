@@ -90,3 +90,45 @@ jobs:
             done
           } > release-body.md
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-body.md
+
+      - name: Point marketing site at this installer
+        if: ${{ success() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VER="${TAG#v}"
+          NAME="Orblune_${VER}_x64-setup.exe"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${NAME}"
+          git fetch origin main
+          git checkout -B main origin/main
+          printf '%s\n' "{\"tag\":\"${TAG}\",\"name\":\"${NAME}\",\"url\":\"${URL}\"}" > docs/latest-download.json
+          # Keep no-JS download buttons pointing at the same asset.
+          python - <<'PY'
+          from pathlib import Path
+          import json, re
+          data = json.loads(Path("docs/latest-download.json").read_text(encoding="utf-8"))
+          html_path = Path("docs/index.html")
+          html = html_path.read_text(encoding="utf-8")
+          html = re.sub(
+              r'https://github\.com/CByBB/Orblune/releases/download/v[\w.-]+/Orblune_[\w.-]+_x64-setup\.exe',
+              data["url"],
+              html,
+          )
+          html = re.sub(
+              r'download="Orblune_[\w.-]+_x64-setup\.exe"',
+              f'download="{data["name"]}"',
+              html,
+          )
+          html_path.write_text(html, encoding="utf-8")
+          PY
+          git add docs/latest-download.json docs/index.html
+          if git diff --cached --quiet; then
+            echo "Download pointer already current."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Point marketing download at ${TAG}."
+          git push origin main
