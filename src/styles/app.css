@@ -266,6 +266,16 @@ section h3 {
   margin-top: 8px;
 }
 
+.display-block {
+  margin-bottom: 8px;
+}
+
+.display-block + .display-block {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+
 .row {
   display: flex;
   align-items: center;

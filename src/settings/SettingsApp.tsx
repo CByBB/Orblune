@@ -5,14 +5,18 @@ import { open } from "@tauri-apps/plugin-shell";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { emit, emitTo } from "@tauri-apps/api/event";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
 import { CITIES, FREE_EXTRA_CITY_LIMIT, searchCities } from "../data/cities";
 import { Globe } from "../wallpaper/Globe";
 import {
   canEnableCity,
+  enabledMonitorKeys,
+  getDisplaySettings,
   loadSettings,
   saveSettings,
   type AppSettings,
+  type MonitorInfo,
   DEFAULT_SETTINGS,
 } from "../lib/store";
 import {
@@ -33,6 +37,7 @@ type WallpaperUiStatus = {
   error: string | null;
   virtualWidth: number;
   virtualHeight: number;
+  monitorCount?: number;
 };
 
 export function SettingsApp() {
@@ -51,6 +56,7 @@ export function SettingsApp() {
   const [restoreKey, setRestoreKey] = useState("");
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>("…");
+  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
 
   useEffect(() => {
     let statusPoll = 0;
@@ -75,8 +81,10 @@ export function SettingsApp() {
       } catch {
         /* ignore */
       }
+      await refreshMonitors();
       statusPoll = window.setInterval(() => {
         void refreshStatus();
+        void refreshMonitors();
       }, 4000);
     })();
     return () => {
@@ -89,9 +97,25 @@ export function SettingsApp() {
     await saveSettings(next);
     try {
       await emit("settings-updated", next);
-      await emitTo("wallpaper", "settings-updated", next);
+      const wins = await getAllWebviewWindows();
+      await Promise.all(
+        wins
+          .filter(
+            (w) => w.label === "wallpaper" || w.label.startsWith("wallpaper-"),
+          )
+          .map((w) => emitTo(w.label, "settings-updated", next)),
+      );
     } catch {
       /* ok */
+    }
+  }
+
+  async function refreshMonitors() {
+    try {
+      const list = await invoke<MonitorInfo[]>("wallpaper_list_monitors");
+      setMonitors(list);
+    } catch {
+      /* ignore */
     }
   }
 
@@ -105,20 +129,60 @@ export function SettingsApp() {
         error: friendlyError(e, "Could not read wallpaper status."),
         virtualWidth: 0,
         virtualHeight: 0,
+        monitorCount: 0,
       });
     }
+  }
+
+  async function syncWallpaperAttach(next: AppSettings, list: MonitorInfo[] = monitors) {
+    if (!next.wallpaperEnabled) return;
+    const keys = enabledMonitorKeys(next, list);
+    try {
+      if (keys.length === 0) await invoke("wallpaper_detach");
+      else await invoke("wallpaper_attach", { enabledKeys: keys });
+    } catch (e) {
+      console.warn(e);
+    }
+    await refreshStatus();
   }
 
   async function toggleWallpaper(on: boolean) {
     const next = { ...settings, wallpaperEnabled: on };
     await persist(next);
     try {
-      if (on) await invoke("wallpaper_attach");
-      else await invoke("wallpaper_detach");
+      if (on) {
+        const list =
+          monitors.length > 0
+            ? monitors
+            : await invoke<MonitorInfo[]>("wallpaper_list_monitors");
+        if (monitors.length === 0) setMonitors(list);
+        await syncWallpaperAttach(next, list);
+      } else {
+        await invoke("wallpaper_detach");
+        await refreshStatus();
+      }
     } catch (e) {
       console.warn(e);
+      await refreshStatus();
     }
-    await refreshStatus();
+  }
+
+  async function updateDisplay(
+    key: string,
+    patch: Partial<{ enabled: boolean; mapTheme: MapThemeId | null }>,
+  ) {
+    const prev = getDisplaySettings(settings, key);
+    const next: AppSettings = {
+      ...settings,
+      displaySettings: {
+        ...settings.displaySettings,
+        [key]: { ...prev, ...patch },
+      },
+    };
+    await persist(next);
+    if (patch.enabled !== undefined) {
+      await syncWallpaperAttach(next);
+    }
   }
 
   async function detectLocation() {
@@ -278,14 +342,19 @@ export function SettingsApp() {
   }
 
   async function finishOnboarding() {
-    await persist({ ...settings, onboardingDone: true, wallpaperEnabled: true });
+    const next = { ...settings, onboardingDone: true, wallpaperEnabled: true };
+    await persist(next);
     try {
-      await invoke("wallpaper_attach");
+      const list =
+        monitors.length > 0
+          ? monitors
+          : await invoke<MonitorInfo[]>("wallpaper_list_monitors");
+      if (monitors.length === 0) setMonitors(list);
+      await syncWallpaperAttach(next, list);
     } catch {
       /* ignore */
     }
     setTab("wallpaper");
-    await refreshStatus();
   }
 
   const filteredCities = useMemo(() => searchCities(cityQuery), [cityQuery]);
@@ -366,6 +435,12 @@ export function SettingsApp() {
                   <div className="error">
                     {friendlyError(status.error, "Wallpaper could not attach to the desktop.")}
                   </div>
+                )}
+                {settings.wallpaperEnabled && status?.attached && (
+                  <p className="muted">
+                    Active on {status.monitorCount ?? 1} display
+                    {(status.monitorCount ?? 1) === 1 ? "" : "s"}
+                  </p>
                 )}
                 <label className="row">
                   <span>Launch at startup</span>
@@ -518,9 +593,9 @@ export function SettingsApp() {
                   />
                 </label>
                 <label className="row">
-                  <span>Map theme</span>
+                  <span>Default map theme</span>
                   <LineSelect
-                    aria-label="Map theme"
+                    aria-label="Default map theme"
                     disabled={!settings.premium}
                     value={settings.mapTheme}
                     options={MAP_THEMES.map((t) => ({ value: t.id, label: t.label }))}
@@ -549,6 +624,64 @@ export function SettingsApp() {
                   />
                 </label>
               </fieldset>
+
+              {monitors.length > 1 && (
+                <>
+                  <h3>Displays</h3>
+                  <p className="panel-intro">
+                    Turn the live wallpaper on or off per screen
+                    {settings.premium ? ", and pick a theme for each." : "."}
+                  </p>
+                  <div className="stack">
+                    {monitors.map((m) => {
+                      const d = getDisplaySettings(settings, m.key);
+                      const themeValue = d.mapTheme ?? "inherit";
+                      return (
+                        <div key={m.key} className="display-block">
+                          <label className="row">
+                            <span>
+                              {m.name}{" "}
+                              <span className="muted">
+                                {m.width}×{m.height}
+                              </span>
+                            </span>
+                            <span className="toggle">
+                              <input
+                                type="checkbox"
+                                checked={d.enabled}
+                                onChange={(e) =>
+                                  void updateDisplay(m.key, { enabled: e.target.checked })
+                                }
+                              />
+                              <span className="toggle-track" />
+                            </span>
+                          </label>
+                          <label className="row">
+                            <span>Theme</span>
+                            <LineSelect
+                              aria-label={`${m.name} theme`}
+                              disabled={!settings.premium || !d.enabled}
+                              value={themeValue}
+                              options={[
+                                { value: "inherit", label: "Same as default" },
+                                ...MAP_THEMES.map((t) => ({
+                                  value: t.id,
+                                  label: t.label,
+                                })),
+                              ]}
+                              onChange={(v) =>
+                                void updateDisplay(m.key, {
+                                  mapTheme: v === "inherit" ? null : (v as MapThemeId),
+                                })
+                              }
+                            />
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </section>
           )}
 

@@ -1,6 +1,6 @@
 [package]
 name = "orblune"
-version = "0.1.4"
+version = "0.1.5"
 description = "Orblune — live Earth wallpaper with world times and weather"
 authors = ["Aesop"]
 edition = "2021"

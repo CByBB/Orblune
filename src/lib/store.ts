@@ -6,6 +6,12 @@ export type TempUnit = "C" | "F";
 export type LabelSize = "small" | "medium" | "large";
 export type { MapThemeId };
 
+export type DisplayWallpaperSettings = {
+  enabled: boolean;
+  /** null = inherit global mapTheme */
+  mapTheme: MapThemeId | null;
+};
+
 export type AppSettings = {
   onboardingDone: boolean;
   wallpaperEnabled: boolean;
@@ -19,8 +25,23 @@ export type AppSettings = {
   hour12: boolean;
   labelSize: LabelSize;
   mapTheme: MapThemeId;
+  /** Per-monitor overrides keyed by Windows device string (e.g. \\\\.\\DISPLAY1). */
+  displaySettings: Record<string, DisplayWallpaperSettings>;
   licenseToken: string | null;
   premium: boolean;
+};
+
+export type MonitorInfo = {
+  index: number;
+  key: string;
+  name: string;
+  width: number;
+  height: number;
+};
+
+export const DEFAULT_DISPLAY_SETTINGS: DisplayWallpaperSettings = {
+  enabled: true,
+  mapTheme: null,
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -36,6 +57,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hour12: false,
   labelSize: "medium",
   mapTheme: DEFAULT_MAP_THEME,
+  displaySettings: {},
   licenseToken: null,
   premium: false,
 };
@@ -55,6 +77,56 @@ function migrateLabelSize(raw: Record<string, unknown> | null | undefined): Labe
   return "medium";
 }
 
+function migrateDisplaySettings(
+  raw: Record<string, unknown> | null | undefined,
+): Record<string, DisplayWallpaperSettings> {
+  const src = raw?.displaySettings;
+  if (!src || typeof src !== "object") return {};
+  const out: Record<string, DisplayWallpaperSettings> = {};
+  for (const [key, value] of Object.entries(src as Record<string, unknown>)) {
+    if (!value || typeof value !== "object") continue;
+    const v = value as Record<string, unknown>;
+    const theme = v.mapTheme;
+    out[key] = {
+      enabled: v.enabled !== false,
+      mapTheme: typeof theme === "string" && isMapThemeId(theme) ? theme : null,
+    };
+  }
+  return out;
+}
+
+export function getDisplaySettings(
+  settings: AppSettings,
+  key: string,
+): DisplayWallpaperSettings {
+  const d = settings.displaySettings?.[key];
+  if (!d) return { ...DEFAULT_DISPLAY_SETTINGS };
+  return {
+    enabled: d.enabled !== false,
+    mapTheme: d.mapTheme && isMapThemeId(d.mapTheme) ? d.mapTheme : null,
+  };
+}
+
+export function enabledMonitorKeys(
+  settings: AppSettings,
+  monitors: { key: string }[],
+): string[] {
+  return monitors
+    .filter((m) => getDisplaySettings(settings, m.key).enabled)
+    .map((m) => m.key);
+}
+
+export function resolveMapThemeForDisplay(
+  settings: AppSettings,
+  key: string | null | undefined,
+): MapThemeId {
+  if (key) {
+    const d = getDisplaySettings(settings, key);
+    if (d.mapTheme) return d.mapTheme;
+  }
+  return settings.mapTheme ?? DEFAULT_MAP_THEME;
+}
+
 let storePromise: Promise<Store> | null = null;
 
 async function getStore(): Promise<Store> {
@@ -72,6 +144,7 @@ export async function loadSettings(): Promise<AppSettings> {
       ...DEFAULT_SETTINGS,
       ...(raw as Partial<AppSettings>),
       labelSize: migrateLabelSize(raw),
+      displaySettings: migrateDisplaySettings(raw),
     };
     if (!isMapThemeId(merged.mapTheme)) merged.mapTheme = DEFAULT_MAP_THEME;
     return merged;

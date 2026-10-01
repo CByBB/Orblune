@@ -29,6 +29,7 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![
             wallpaper::wallpaper_status,
+            wallpaper::wallpaper_list_monitors,
             wallpaper::wallpaper_attach,
             wallpaper::wallpaper_detach,
             wallpaper::wallpaper_primary_bounds,
@@ -53,13 +54,10 @@ pub fn run() {
                         }
                     }
                     "pause" => {
-                        if let Some(window) = app.get_webview_window("wallpaper") {
-                            let visible = window.is_visible().unwrap_or(false);
-                            if visible {
-                                let _ = wallpaper::detach_wallpaper_window(&window);
-                            } else {
-                                let _ = wallpaper::attach_wallpaper_window(&window);
-                            }
+                        if wallpaper::status(app).attached {
+                            let _ = wallpaper::detach_all(app);
+                        } else {
+                            let _ = wallpaper::attach_all(app, None);
                         }
                     }
                     "quit" => {
