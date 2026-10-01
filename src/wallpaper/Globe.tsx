@@ -136,7 +136,8 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     const labelLayer: HTMLDivElement = labelLayerEl;
 
     let disposed = false;
-    const weatherCache = new Map<string, WeatherSnapshot | null>();
+    const weatherCache = new Map<string, WeatherSnapshot>();
+    const weatherInflight = new Set<string>();
     let raf = 0;
     let poll = 0;
     let weatherPoll = 0;
@@ -275,9 +276,12 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       if (!(weatherEl instanceof HTMLElement)) return;
       const w = weatherCache.get(m.id);
       if (!w) {
-        weatherEl.innerHTML = "";
+        // Keep row reserved (invisible placeholder) so card height never collapses.
+        weatherEl.innerHTML = `<span class="city-weather-slot" aria-hidden="true">&nbsp;</span>`;
+        weatherEl.dataset.empty = "1";
         return;
       }
+      weatherEl.dataset.empty = "0";
       weatherEl.innerHTML = `${weatherSvg(symbolToIcon(w.symbol))}<span>${formatTemp(w.temperatureC, s.tempUnit)}</span>`;
     }
 
@@ -324,13 +328,14 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     function requestWeather(m: MarkerData) {
       if (!m.showWeather) return;
       const cached = weatherCache.get(m.id);
-      if (cached === null) return; // in flight
       if (cached && cached.expiresAt > Date.now()) return;
-      weatherCache.set(m.id, null);
+      if (weatherInflight.has(m.id)) return;
+      // Keep stale weather on screen while refreshing — avoids card height jumps.
+      weatherInflight.add(m.id);
       fetchWeather(m.lat, m.lon).then((w) => {
+        weatherInflight.delete(m.id);
         if (disposed) return;
         if (w) weatherCache.set(m.id, w);
-        else weatherCache.delete(m.id);
         const node = labelLayer.querySelector(`[data-id="${m.id.replace(/"/g, "")}"]`);
         if (node instanceof HTMLElement) {
           updateLabelContent(node, m, settingsRef.current, new Date());
@@ -453,10 +458,6 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
 
     weatherPoll = window.setInterval(() => {
       for (const m of buildMarkers(settingsRef.current)) {
-        const cached = weatherCache.get(m.id);
-        if (cached && cached.expiresAt <= Date.now()) {
-          weatherCache.delete(m.id);
-        }
         requestWeather(m);
       }
     }, cfg.weatherRefreshMs);

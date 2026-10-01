@@ -168,14 +168,21 @@
   gap: 6px;
   margin-top: 8px;
   width: 100%;
+  min-height: 14px;
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: rgba(170, 210, 225, 0.95);
 }
 
-.city-weather:empty {
-  display: none;
+.city-weather[data-empty="1"] {
+  opacity: 0;
+}
+
+.city-weather-slot {
+  display: inline-block;
+  min-width: 2.5em;
+  min-height: 1em;
 }
 
 .city-weather svg {

@@ -10,8 +10,8 @@ use windows::Win32::Graphics::Gdi::{
     EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, MONITORINFOEXW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, FindWindowExW, FindWindowW, GetParent, GetSystemMetrics, GetWindow,
-    GetWindowLongPtrW, GetWindowRect, SendMessageTimeoutW, SetParent, SetWindowLongPtrW,
+    EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetParent, GetSystemMetrics, GetWindow,
+    GetWindowLongPtrW, GetWindowRect, IsWindow, SendMessageTimeoutW, SetParent, SetWindowLongPtrW,
     SetWindowPos, GWL_EXSTYLE, GW_CHILD, GW_HWNDNEXT, HWND_BOTTOM, SMTO_NORMAL,
     SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SWP_NOACTIVATE,
     SWP_NOZORDER, SWP_SHOWWINDOW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
@@ -23,6 +23,8 @@ static LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
 static ATTACH_LOCK: Mutex<()> = Mutex::new(());
 /// Last explicitly requested enabled monitor keys. `None` means “all monitors”.
 static LAST_ENABLED_KEYS: Mutex<Option<Vec<String>>> = Mutex::new(None);
+/// Cached desktop WorkerW — avoid re-sending Progman 0x052C (causes desktop flashes).
+static CACHED_WORKER: Mutex<Option<isize>> = Mutex::new(None);
 
 #[derive(Debug, Clone)]
 struct MonitorRect {
@@ -119,29 +121,48 @@ unsafe extern "system" fn enum_worker_w(hwnd: HWND, lparam: LPARAM) -> BOOL {
     BOOL(1)
 }
 
-fn find_worker_w() -> Option<HWND> {
+fn cache_worker(hwnd: HWND) {
+    if let Ok(mut guard) = CACHED_WORKER.lock() {
+        *guard = Some(hwnd.0 as isize);
+    }
+}
+
+fn cached_worker() -> Option<HWND> {
+    let raw = CACHED_WORKER.lock().ok().and_then(|g| *g)?;
+    let hwnd = HWND(raw as *mut _);
     unsafe {
-        let progman = hwnd_ok(FindWindowW(windows::core::w!("Progman"), None));
-        if is_null(progman) {
-            return None;
+        if IsWindow(Some(hwnd)).as_bool() && is_worker_w_class(hwnd) {
+            Some(hwnd)
+        } else {
+            None
         }
+    }
+}
 
-        let _ = SendMessageTimeoutW(
-            progman,
-            0x052C,
-            WPARAM(0),
-            LPARAM(0),
-            SMTO_NORMAL,
-            1000,
-            None,
-        );
+fn is_worker_w_class(hwnd: HWND) -> bool {
+    unsafe {
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf);
+        if n <= 0 {
+            return false;
+        }
+        let name = String::from_utf16_lossy(&buf[..n as usize]);
+        name == "WorkerW"
+    }
+}
 
+fn discover_worker_w() -> Option<HWND> {
+    unsafe {
         let mut worker = HWND::default();
         let _ = EnumWindows(Some(enum_worker_w), LPARAM(&mut worker as *mut _ as isize));
         if !is_null(worker) {
             return Some(worker);
         }
 
+        let progman = hwnd_ok(FindWindowW(windows::core::w!("Progman"), None));
+        if is_null(progman) {
+            return None;
+        }
         let mut child = hwnd_ok(GetWindow(progman, GW_CHILD));
         while !is_null(child) {
             let view = hwnd_ok(FindWindowExW(
@@ -165,6 +186,38 @@ fn find_worker_w() -> Option<HWND> {
         }
         None
     }
+}
+
+/// Locate WorkerW. Only send Progman 0x052C when missing — that message can flash the desktop.
+fn find_worker_w(allow_spawn: bool) -> Option<HWND> {
+    if let Some(hwnd) = cached_worker() {
+        return Some(hwnd);
+    }
+    if let Some(hwnd) = discover_worker_w() {
+        cache_worker(hwnd);
+        return Some(hwnd);
+    }
+    if !allow_spawn {
+        return None;
+    }
+    unsafe {
+        let progman = hwnd_ok(FindWindowW(windows::core::w!("Progman"), None));
+        if is_null(progman) {
+            return None;
+        }
+        let _ = SendMessageTimeoutW(
+            progman,
+            0x052C,
+            WPARAM(0),
+            LPARAM(0),
+            SMTO_NORMAL,
+            1000,
+            None,
+        );
+    }
+    let hwnd = discover_worker_w()?;
+    cache_worker(hwnd);
+    Some(hwnd)
 }
 
 fn virtual_screen() -> (i32, i32, i32, i32) {
@@ -293,9 +346,10 @@ fn prune_extra_windows(app: &AppHandle, keep: usize) {
 }
 
 fn window_needs_reattach(hwnd: HWND, worker: HWND, monitor: &MonitorRect) -> bool {
+    const TOL: i32 = 8; // DPI/rounding — exact match caused periodic false reattach flashes
     unsafe {
         let parent = GetParent(hwnd).unwrap_or_default();
-        if parent != worker {
+        if parent != worker || !IsWindow(Some(parent)).as_bool() {
             return true;
         }
         let mut rect = RECT::default();
@@ -304,7 +358,10 @@ fn window_needs_reattach(hwnd: HWND, worker: HWND, monitor: &MonitorRect) -> boo
         }
         let w = rect.right - rect.left;
         let h = rect.bottom - rect.top;
-        rect.left != monitor.x || rect.top != monitor.y || w != monitor.w || h != monitor.h
+        (rect.left - monitor.x).abs() > TOL
+            || (rect.top - monitor.y).abs() > TOL
+            || (w - monitor.w).abs() > TOL
+            || (h - monitor.h).abs() > TOL
     }
 }
 
@@ -315,15 +372,17 @@ fn attach_window_to_monitor(
 ) -> Result<(), String> {
     let hwnd = HWND(window.hwnd().map_err(|e| e.to_string())?.0 as *mut _);
 
-    let worker = find_worker_w().ok_or_else(|| {
+    let worker = find_worker_w(true).ok_or_else(|| {
         "Could not find the desktop WorkerW window. Explorer may still be starting.".to_string()
     })?;
 
-    // Skip SetParent/SetWindowPos when already correctly hosted — avoids acrylic taskbar flicker.
+    // Skip SetParent/SetWindowPos when already correctly hosted — avoids desktop flashes.
     if !force && !window_needs_reattach(hwnd, worker, monitor) {
         let _ = window.set_ignore_cursor_events(true);
         return Ok(());
     }
+
+    let already_visible = window.is_visible().unwrap_or(false);
 
     unsafe {
         prepare_window_styles(hwnd);
@@ -335,6 +394,11 @@ fn attach_window_to_monitor(
         let rel_x = monitor.x - worker_rect.left;
         let rel_y = monitor.y - worker_rect.top;
 
+        let mut flags = SWP_NOACTIVATE | SWP_NOZORDER;
+        if !already_visible {
+            flags |= SWP_SHOWWINDOW;
+        }
+
         SetWindowPos(
             hwnd,
             Some(HWND_BOTTOM),
@@ -342,13 +406,15 @@ fn attach_window_to_monitor(
             rel_y,
             monitor.w,
             monitor.h,
-            SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOZORDER,
+            flags,
         )
         .map_err(|e| e.to_string())?;
     }
 
     let _ = window.set_ignore_cursor_events(true);
-    let _ = window.show();
+    if !already_visible {
+        let _ = window.show();
+    }
     Ok(())
 }
 
@@ -522,14 +588,50 @@ pub fn wallpaper_primary_bounds(app: AppHandle) -> Result<(i32, i32, i32, i32), 
     Ok((m.x, m.y, m.w, m.h))
 }
 
+/// Quiet health check: no Progman spawn, no SetParent unless something is actually detached.
+fn wallpaper_hosts_healthy(app: &AppHandle) -> bool {
+    let filter = LAST_ENABLED_KEYS.lock().ok().and_then(|g| g.clone());
+    let Some(worker) = find_worker_w(false) else {
+        return false;
+    };
+    let monitors = list_monitors();
+    if monitors.is_empty() {
+        return false;
+    }
+    let mut saw_enabled = false;
+    for (index, monitor) in monitors.iter().enumerate() {
+        if !monitor_is_enabled(monitor, &filter) {
+            continue;
+        }
+        saw_enabled = true;
+        let Some(window) = app.get_webview_window(&wallpaper_label(index)) else {
+            return false;
+        };
+        let Ok(hwnd_raw) = window.hwnd() else {
+            return false;
+        };
+        let hwnd = HWND(hwnd_raw.0 as *mut _);
+        if window_needs_reattach(hwnd, worker, monitor) {
+            return false;
+        }
+        if !window.is_visible().unwrap_or(false) {
+            return false;
+        }
+    }
+    saw_enabled
+}
+
 pub fn spawn_reattach_loop(app: AppHandle) {
     std::thread::spawn(move || loop {
-        // Slow health check only — avoid periodic SetParent (acrylic taskbar flicker).
-        std::thread::sleep(std::time::Duration::from_secs(30));
+        std::thread::sleep(std::time::Duration::from_secs(45));
         if !ATTACHED.load(Ordering::SeqCst) {
             continue;
         }
-        if let Err(e) = attach_all(&app, None, false) {
+        // Only repair when something is actually wrong — avoids periodic desktop flashes.
+        if wallpaper_hosts_healthy(&app) {
+            continue;
+        }
+        if let Err(e) = attach_all(&app, None, true) {
             set_error(e);
         }
     });
