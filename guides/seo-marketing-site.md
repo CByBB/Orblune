@@ -96,9 +96,14 @@ Harder; need relevance + links over time.
 
 - `live Earth wallpaper Windows`
 - `live earth wallpaper`
+- `live Earth wallpaper for Windows 11`
 - `day night wallpaper Windows`
 - `world clock wallpaper`
 - `desktop globe wallpaper`
+- `live wallpaper with time zones`
+- `live Earth time`
+- `animated Earth wallpaper Windows`
+- `multi monitor live wallpaper Windows`
 - `Earth map live wallpaper Windows`
 
 **C — Long-tail (realistic early wins)**  

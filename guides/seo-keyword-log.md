@@ -14,9 +14,13 @@ Fill a row when you test. Use incognito / `pws=0`. Track the **Pages URL**, not 
 | | `CByBB Orblune` | | | |
 | | `live Earth wallpaper Windows` | | | |
 | | `live earth wallpaper` | | | |
+| | `live Earth time` | | | |
 | | `world clock wallpaper` | | | |
 | | `day night wallpaper Windows` | | | |
 | | `desktop globe wallpaper` | | | |
+| | `animated Earth wallpaper Windows` | | | |
+| | `multi monitor live wallpaper` | | | |
+| | `live wallpaper with time zones` | | | |
 
 ## Follow-ups
 

@@ -611,6 +611,112 @@ a {
   line-height: 1.55;
 }
 
+.about,
+.faq {
+  position: relative;
+  z-index: 1;
+  padding: clamp(4rem, 12vh, 7.5rem) 0;
+}
+
+.prose-block {
+  width: min(100%, var(--max));
+  margin: 0 auto;
+  padding: 0 var(--pad);
+  max-width: 42rem;
+}
+
+.prose-block p {
+  margin: 0 0 1.15rem;
+  color: var(--muted);
+  font-size: clamp(1.05rem, 2vw, 1.18rem);
+  font-weight: 300;
+  line-height: 1.65;
+}
+
+.prose-block strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.keyword-list {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.keyword-list li {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 400;
+}
+
+.keyword-list li:last-child {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.faq-list {
+  width: min(100%, var(--max));
+  margin: 0 auto;
+  padding: 0 var(--pad);
+  display: grid;
+  gap: 0.65rem;
+  max-width: 46rem;
+}
+
+.faq-list details {
+  border: 1px solid var(--line-soft);
+  background: rgba(7, 16, 24, 0.45);
+  padding: 0.15rem 0;
+}
+
+.faq-list summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 1.05rem 1.15rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 2.4vw, 1.4rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-list summary::after {
+  content: "+";
+  float: right;
+  color: var(--accent);
+  font-family: var(--font);
+  font-weight: 400;
+}
+
+.faq-list details[open] summary::after {
+  content: "–";
+}
+
+.faq-list details p {
+  margin: 0;
+  padding: 0 1.15rem 1.15rem;
+  color: var(--muted);
+  font-size: 1.02rem;
+  font-weight: 300;
+  line-height: 1.6;
+  max-width: 40rem;
+}
+
+.faq-list details a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(143, 214, 234, 0.35);
+  text-underline-offset: 0.15em;
+}
+
 .download {
   position: relative;
   z-index: 1;

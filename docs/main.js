@@ -250,7 +250,9 @@ function watchScroll() {
 }
 
 function revealOnScroll() {
-  const nodes = document.querySelectorAll(".section-head, .theme-stage, .shot-row, .feature-list, .download-panel");
+  const nodes = document.querySelectorAll(
+    ".section-head, .prose-block, .theme-stage, .shot-row, .feature-list, .faq-list, .download-panel",
+  );
   for (const node of nodes) node.classList.add("reveal");
   const io = new IntersectionObserver(
     (entries) => {
