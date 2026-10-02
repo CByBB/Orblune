@@ -182,8 +182,7 @@ def paste_card(
 def main() -> None:
     canvas = base.copy()
     cities = [
-        (51.5074, -0.1278, "09:42", "London", "BST", "14\u00b0C", "partly", True),
-        (40.7128, -74.0060, "04:42", "New York", "EDT", "11\u00b0C", "rain", False),
+        (40.7128, -74.0060, "04:42", "New York", "EDT", "11\u00b0C", "rain", True),
         (35.6762, 139.6503, "17:42", "Tokyo", "JST", "19\u00b0C", "clear", False),
         (25.2048, 55.2708, "12:42", "Dubai", "GST", "33\u00b0C", "clear", False),
         (-33.8688, 151.2093, "18:42", "Sydney", "AEST", "22\u00b0C", "clear", False),
