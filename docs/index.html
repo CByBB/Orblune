@@ -42,13 +42,13 @@
     />
     <meta name="twitter:image" content="https://cbybb.github.io/Orblune/assets/og-cover.jpg" />
 
-    <meta name="theme-color" content="#03060c" />
+    <meta name="theme-color" content="#05070b" />
     <link rel="icon" type="image/png" href="assets/favicon.png" />
     <link rel="apple-touch-icon" href="assets/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@300;400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
@@ -184,11 +184,11 @@
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
-    <div class="ambient" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
 
     <header class="top">
       <a class="brand" href="#top" aria-label="Orblune home">
-        <img src="assets/orblune.svg" width="32" height="32" alt="" />
+        <img src="assets/orblune.svg" width="28" height="28" alt="" />
         <span>Orblune</span>
       </a>
       <nav class="nav" aria-label="Primary">
@@ -214,13 +214,13 @@
             decoding="async"
           />
           <div class="hero-scrim"></div>
-          <div class="hero-glow"></div>
+          <div class="hero-band"></div>
         </div>
         <div class="hero-copy">
           <p class="brand-mark" data-letters>Orblune</p>
           <h1 id="hero-title" data-letters>Best live Earth wallpaper for Windows</h1>
           <p class="lede" data-letters>
-            A calm desktop background with real sun day/night, world clocks, and weather.
+            Real sun day/night, world clocks, and weather — a calm desktop background that moves with Earth.
           </p>
           <div class="cta-row" data-after-letters>
             <a class="btn primary" id="download-btn" href="https://github.com/CByBB/Orblune/releases/download/v1.0.2/Orblune_1.0.2_x64-setup.exe" download="Orblune_1.0.2_x64-setup.exe">
@@ -233,36 +233,38 @@
       </section>
 
       <section class="about" id="about">
-        <div class="section-head">
-          <p class="eyebrow">What it is</p>
-          <h2>A live Earth wallpaper with live Earth time</h2>
-          <p>
-            Looking for the best live Earth wallpaper, the best Windows wallpaper that actually
-            moves with the sun, or the best desktop background with world clocks? Orblune is built
-            for that.
-          </p>
-        </div>
-        <div class="prose-block">
-          <p>
-            Most “best wallpaper” lists are still static photos. Orblune is a
-            <strong>live Earth wallpaper</strong>: the terminator follows the real sun, night shows
-            city lights, and city cards show <strong>live Earth time</strong> across time zones —
-            with optional weather on the pins.
-          </p>
-          <p>
-            It targets Windows 10 and Windows 11 as a current-user install (no admin). Use it as an
-            animated Earth map wallpaper on one screen or as a multi-monitor live wallpaper with
-            per-display controls. Free tier included; Premium unlocks more cities, weather, and map
-            themes — a strong pick if you want one of the best live wallpapers for Windows without
-            noisy widgets.
-          </p>
-          <ul class="keyword-list">
-            <li>Best live Earth wallpaper for Windows 10 &amp; 11</li>
-            <li>Best desktop background with live Earth time</li>
-            <li>Day and night wallpaper from real solar position</li>
-            <li>World clock wallpaper with map pins</li>
-            <li>Multi-monitor live wallpaper support</li>
-          </ul>
+        <div class="about-grid">
+          <div>
+            <p class="eyebrow">What it is</p>
+            <p class="about-statement">
+              A live Earth wallpaper
+              <span>with live Earth time.</span>
+            </p>
+          </div>
+          <div class="prose-block">
+            <p>
+              Looking for the best live Earth wallpaper, the best Windows wallpaper that actually
+              moves with the sun, or the best desktop background with world clocks? Orblune is built
+              for that.
+            </p>
+            <p>
+              Most “best wallpaper” lists are still static photos. Orblune is a
+              <strong>live Earth wallpaper</strong>: the terminator follows the real sun, night shows
+              city lights, and city cards show <strong>live Earth time</strong> across time zones —
+              with optional weather on the pins.
+            </p>
+            <p>
+              Free for Windows 10 &amp; 11 (current-user, no admin). One screen or multi-monitor.
+              Premium unlocks more cities, weather, and map themes — without noisy widgets.
+            </p>
+            <p class="keyword-strip" aria-label="Highlights">
+              <span>Best live Earth wallpaper</span>
+              <span>Best desktop background</span>
+              <span>Day &amp; night from the real sun</span>
+              <span>World clock pins</span>
+              <span>Multi-monitor</span>
+            </p>
+          </div>
         </div>
       </section>
 
@@ -281,16 +283,16 @@
                 class="theme-layer is-front"
                 src="assets/theme-natural.jpg"
                 alt="Natural Earth map theme preview in Orblune"
-                width="960"
-                height="540"
+                width="1920"
+                height="822"
               />
               <img
                 id="theme-preview-b"
                 class="theme-layer"
                 src="assets/theme-aqua.jpg"
                 alt=""
-                width="960"
-                height="540"
+                width="1920"
+                height="822"
                 aria-hidden="true"
               />
             </div>
@@ -346,23 +348,31 @@
         <ul class="feature-list">
           <li style="--i: 0">
             <span class="feature-index">01</span>
-            <h3>Day and night</h3>
-            <p>Terminator follows the real sun. City lights bloom after dusk.</p>
+            <div>
+              <h3>Day and night</h3>
+              <p>Terminator follows the real sun. City lights bloom after dusk.</p>
+            </div>
           </li>
           <li style="--i: 1">
             <span class="feature-index">02</span>
-            <h3>Times that pin</h3>
-            <p>Home city plus world clocks, locked to the map — not floating chrome.</p>
+            <div>
+              <h3>Times that pin</h3>
+              <p>Home city plus world clocks, locked to the map — not floating chrome.</p>
+            </div>
           </li>
           <li style="--i: 2">
             <span class="feature-index">03</span>
-            <h3>Weather, quietly</h3>
-            <p>MET Norway forecasts on the cards that matter. Refresh without layout jump.</p>
+            <div>
+              <h3>Weather, quietly</h3>
+              <p>MET Norway forecasts on the cards that matter. Refresh without layout jump.</p>
+            </div>
           </li>
           <li style="--i: 3">
             <span class="feature-index">04</span>
-            <h3>Multi-monitor</h3>
-            <p>Enable displays independently. Premium can set a theme per screen.</p>
+            <div>
+              <h3>Multi-monitor</h3>
+              <p>Enable displays independently. Premium can set a theme per screen.</p>
+            </div>
           </li>
         </ul>
       </section>
