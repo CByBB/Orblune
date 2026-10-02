@@ -19,9 +19,10 @@ THEMES = ["natural", "aqua", "atlas", "vivid", "noir", "ember", "frost", "verdan
 THEME_INDEX = {name: float(i) for i, name in enumerate(THEMES)}
 
 CROPS = {
-    "atlantic": (0.28, 0.72, 0.12, 0.62),
-    "pacific": (0.62, 0.98, 0.18, 0.58),
-    "asia": (0.55, 0.95, 0.15, 0.55),
+    # Wider / taller framing for more source pixels into 21:9 + 16:9 exports.
+    "atlantic": (0.22, 0.78, 0.10, 0.64),
+    "pacific": (0.58, 1.00, 0.14, 0.60),
+    "asia": (0.50, 0.98, 0.12, 0.58),
 }
 
 
@@ -186,11 +187,38 @@ def render_theme(
 
 def themed_crop(theme: str, crop_key: str, size: tuple[int, int]) -> Image.Image:
     u0, u1, v0, v1 = CROPS[crop_key]
-    d = crop_uv(day_full, u0, u1, v0, v1).resize(size, Image.Resampling.LANCZOS)
-    n = crop_uv(night_full, u0, u1, v0, v1).resize(size, Image.Resampling.LANCZOS)
-    c = crop_uv(clouds_full, u0, u1, v0, v1).resize(size, Image.Resampling.LANCZOS)
+    # Grade at native crop resolution so we keep texture detail, then resize.
+    d = crop_uv(day_full, u0, u1, v0, v1)
+    n = crop_uv(night_full, u0, u1, v0, v1)
+    c = crop_uv(clouds_full, u0, u1, v0, v1)
+    # Match day/night size if clouds are lower-res.
+    if c.size != d.size:
+        c = c.resize(d.size, Image.Resampling.LANCZOS)
+    if n.size != d.size:
+        n = n.resize(d.size, Image.Resampling.LANCZOS)
     split = 0.52 if crop_key == "atlantic" else 0.42
-    return render_theme(theme, d, n, c, split=split, soft=0.16)
+    img = render_theme(theme, d, n, c, split=split, soft=0.14)
+    if img.size != size:
+        img = img.resize(size, Image.Resampling.LANCZOS)
+    return img
+
+
+def polish(img: Image.Image) -> Image.Image:
+    img = ImageEnhance.Contrast(img).enhance(1.04)
+    img = ImageEnhance.Color(img).enhance(1.03)
+    img = ImageEnhance.Sharpness(img).enhance(1.18)
+    return img
+
+
+def save_jpeg(img: Image.Image, path: Path, quality: int = 93) -> None:
+    img.save(
+        path,
+        "JPEG",
+        quality=quality,
+        optimize=True,
+        progressive=True,
+        subsampling=0,
+    )
 
 
 def main() -> None:
@@ -207,12 +235,13 @@ def main() -> None:
         "sand": "asia",
     }
 
+    # Match the site's full-bleed 21:9 theme stage.
+    theme_size = (2520, 1080)
     for theme in THEMES:
-        img = themed_crop(theme, crop_for[theme], (960, 540))
-        img = ImageEnhance.Contrast(img).enhance(1.02)
+        img = polish(themed_crop(theme, crop_for[theme], theme_size))
         path = OUT / f"theme-{theme}.jpg"
-        img.save(path, "JPEG", quality=88, optimize=True, progressive=True)
-        print("wrote", path.name)
+        save_jpeg(img, path, quality=93)
+        print("wrote", path.name, img.size)
 
     # Desktop showcase shots used on the site
     shots = [
@@ -220,10 +249,11 @@ def main() -> None:
         ("aqua", "pacific", "shot-desktop-aqua.jpg"),
         ("ember", "asia", "shot-desktop-ember.jpg"),
     ]
+    shot_size = (2400, 1350)
     for theme, crop, name in shots:
-        img = themed_crop(theme, crop, (1600, 900))
-        img.save(OUT / name, "JPEG", quality=88, optimize=True, progressive=True)
-        print("wrote", name)
+        img = polish(themed_crop(theme, crop, shot_size))
+        save_jpeg(img, OUT / name, quality=92)
+        print("wrote", name, img.size)
 
 
 if __name__ == "__main__":

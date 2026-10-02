@@ -27,23 +27,73 @@ let frontIsA = true;
 let autoTimer = 0;
 let userPausedUntil = 0;
 
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function splitLetters(el) {
+  const text = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+  el.textContent = "";
+  el.setAttribute("aria-label", text);
+  const letters = [];
+  const words = text.split(" ");
+
+  words.forEach((word, wi) => {
+    const wordSpan = document.createElement("span");
+    wordSpan.className = "word";
+
+    for (const ch of word) {
+      const span = document.createElement("span");
+      span.className = "letter";
+      span.textContent = ch;
+      span.setAttribute("aria-hidden", "true");
+      wordSpan.appendChild(span);
+      letters.push(span);
+    }
+
+    el.appendChild(wordSpan);
+    if (wi < words.length - 1) {
+      const space = document.createElement("span");
+      space.className = "letter is-space";
+      space.textContent = "\u00a0";
+      space.setAttribute("aria-hidden", "true");
+      el.appendChild(space);
+      letters.push(space);
+    }
+  });
+
+  return letters;
+}
+
 function animateHeroLetters() {
   const targets = Array.from(document.querySelectorAll("[data-letters]"));
   const after = Array.from(document.querySelectorAll("[data-after-letters]"));
 
   if (reduceMotion) {
-    for (const el of targets) el.classList.add("is-in");
     for (const el of after) el.classList.add("is-in");
     return;
   }
 
-  targets.forEach((el, i) => {
-    window.setTimeout(() => el.classList.add("is-in"), 120 + i * 160);
-  });
+  const allLetters = [];
+  for (const el of targets) {
+    allLetters.push(...splitLetters(el));
+  }
+
+  const order = shuffle(allLetters);
+  const spanMs = 2200;
+
+  for (const letter of order) {
+    window.setTimeout(() => letter.classList.add("is-in"), Math.random() * spanMs);
+  }
 
   window.setTimeout(() => {
     for (const el of after) el.classList.add("is-in");
-  }, 120 + targets.length * 160 + 180);
+  }, spanMs * 0.72);
 }
 
 function frontLayer() {
@@ -220,7 +270,121 @@ function styleCaptionFade() {
   blurbEl.style.transition = "opacity 0.28s ease";
 }
 
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - (Math.pow(-2 * t + 2, 3) / 2);
+}
+
+let scrollAnim = 0;
+
+function slowScrollTo(hash) {
+  const id = hash.replace("#", "");
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  if (reduceMotion) {
+    el.scrollIntoView();
+    return;
+  }
+
+  const headerH = topBar?.getBoundingClientRect().height ?? 0;
+  const start = window.scrollY;
+  const end = Math.max(0, el.getBoundingClientRect().top + window.scrollY - headerH);
+  const dist = end - start;
+  const duration = Math.min(2600, Math.max(1400, Math.abs(dist) * 0.85));
+  const t0 = performance.now();
+
+  if (scrollAnim) cancelAnimationFrame(scrollAnim);
+
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / duration);
+    window.scrollTo(0, start + dist * easeInOutCubic(t));
+    if (t < 1) scrollAnim = requestAnimationFrame(step);
+    else scrollAnim = 0;
+  };
+  scrollAnim = requestAnimationFrame(step);
+}
+
+function bindSlowNavScroll() {
+  const links = document.querySelectorAll('.nav a[href^="#"], .brand[href^="#"]');
+  for (const link of links) {
+    link.addEventListener("click", (e) => {
+      const href = link.getAttribute("href");
+      if (!href || href === "#") return;
+      e.preventDefault();
+      slowScrollTo(href);
+      history.replaceState(null, "", href);
+    });
+  }
+}
+
+function bindFaqAnimation() {
+  document.documentElement.classList.add("js");
+  const items = document.querySelectorAll(".faq-list details");
+
+  for (const details of items) {
+    const summary = details.querySelector("summary");
+    const panel = details.querySelector(".faq-panel");
+    if (!summary || !panel) continue;
+
+    if (!summary.querySelector(".faq-icon")) {
+      const icon = document.createElement("span");
+      icon.className = "faq-icon";
+      icon.setAttribute("aria-hidden", "true");
+      summary.appendChild(icon);
+    }
+
+    if (!panel.querySelector(".faq-panel-inner")) {
+      const inner = document.createElement("div");
+      inner.className = "faq-panel-inner";
+      while (panel.firstChild) inner.appendChild(panel.firstChild);
+      panel.appendChild(inner);
+    }
+
+    const inner = panel.querySelector(".faq-panel-inner");
+
+    if (details.open) {
+      details.classList.add("is-open");
+      panel.style.height = "auto";
+    }
+
+    summary.addEventListener("click", (e) => {
+      if (reduceMotion) return;
+      e.preventDefault();
+
+      const running = panel.getAnimations?.() ?? [];
+      for (const anim of running) anim.cancel();
+
+      if (details.classList.contains("is-open")) {
+        details.classList.remove("is-open");
+        panel.style.height = `${panel.scrollHeight}px`;
+        panel.getBoundingClientRect();
+        panel.style.height = "0px";
+        const done = (ev) => {
+          if (ev.target !== panel || ev.propertyName !== "height") return;
+          details.removeAttribute("open");
+          panel.removeEventListener("transitionend", done);
+        };
+        panel.addEventListener("transitionend", done);
+        return;
+      }
+
+      details.setAttribute("open", "");
+      details.classList.add("is-open");
+      panel.style.height = "0px";
+      panel.getBoundingClientRect();
+      panel.style.height = `${inner.scrollHeight}px`;
+      const done = (ev) => {
+        if (ev.target !== panel || ev.propertyName !== "height") return;
+        if (details.classList.contains("is-open")) panel.style.height = "auto";
+        panel.removeEventListener("transitionend", done);
+      };
+      panel.addEventListener("transitionend", done);
+    });
+  }
+}
 animateHeroLetters();
+bindSlowNavScroll();
+bindFaqAnimation();
 buildThemeRail();
 styleCaptionFade();
 resolveLatestInstaller();
