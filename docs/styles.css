@@ -89,7 +89,7 @@ a {
   box-sizing: border-box;
   height: calc(var(--header-h) + env(safe-area-inset-top));
   padding: env(safe-area-inset-top) max(var(--pad), calc((100% - var(--max)) / 2)) 0;
-  background: linear-gradient(180deg, rgba(5, 7, 11, 0.72) 0%, rgba(5, 7, 11, 0.28) 70%, transparent 100%);
+  background: transparent;
   border-bottom: 1px solid transparent;
   transition:
     background 0.4s var(--ease),
@@ -112,6 +112,7 @@ a {
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: -0.03em;
+  text-shadow: 0 1px 12px rgba(5, 7, 11, 0.65);
 }
 
 .brand img {
@@ -130,7 +131,8 @@ a {
   gap: clamp(0.9rem, 2.2vw, 1.75rem);
   font-size: 0.92rem;
   font-weight: 500;
-  color: var(--muted);
+  color: rgba(232, 240, 246, 0.82);
+  text-shadow: 0 1px 10px rgba(5, 7, 11, 0.7);
 }
 
 .nav a {
@@ -140,14 +142,16 @@ a {
 
 .nav a:hover,
 .nav a:focus-visible {
-  color: var(--text);
+  color: #fff;
 }
 
 .nav-cta {
   color: var(--accent) !important;
   padding: 0.45rem 0.85rem;
-  border: 1px solid rgba(230, 179, 90, 0.45);
+  border: 1px solid rgba(230, 179, 90, 0.5);
   border-radius: 2px;
+  text-shadow: none;
+  background: rgba(5, 7, 11, 0.35);
 }
 
 .nav-cta:hover {
@@ -184,7 +188,16 @@ a {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(5, 7, 11, 0.58) 0%, rgba(5, 7, 11, 0.12) 14%, transparent 32%, rgba(5, 7, 11, 0.5) 68%, rgba(5, 7, 11, 0.97) 100%),
+    linear-gradient(
+      180deg,
+      rgba(5, 7, 11, 0.78) 0%,
+      rgba(5, 7, 11, 0.42) 7%,
+      rgba(5, 7, 11, 0.16) 14%,
+      transparent 28%,
+      transparent 55%,
+      rgba(5, 7, 11, 0.5) 72%,
+      rgba(5, 7, 11, 0.97) 100%
+    ),
     linear-gradient(105deg, rgba(5, 7, 11, 0.92) 0%, rgba(5, 7, 11, 0.7) 22%, rgba(5, 7, 11, 0.28) 42%, transparent 58%);
   pointer-events: none;
 }
