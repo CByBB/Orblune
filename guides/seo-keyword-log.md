@@ -12,6 +12,10 @@ Fill a row when you test. Use incognito / `pws=0`. Track the **Pages URL**, not 
 | | `Orblune wallpaper` | | | |
 | | `Orblune download` | | | |
 | | `CByBB Orblune` | | | |
+| | `best live Earth wallpaper` | | | |
+| | `best Windows wallpaper` | | | |
+| | `best desktop background` | | | |
+| | `best live wallpaper Windows 11` | | | |
 | | `live Earth wallpaper Windows` | | | |
 | | `live earth wallpaper` | | | |
 | | `live Earth time` | | | |
