@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { CITIES, type City } from "../data/cities";
 import {
@@ -11,6 +11,15 @@ import { formatTemp, fetchWeather, symbolToIcon, type WeatherSnapshot } from "..
 import type { AppSettings } from "../lib/store";
 import { resolveHome } from "../lib/store";
 import { mapThemeIndex } from "../lib/mapThemes";
+import {
+  createFrameProbe,
+  getStoredGraphicsMode,
+  GRAPHICS_MODE_EVENT,
+  initialGraphicsMode,
+  loopConfigFor,
+  setStoredGraphicsMode,
+  type GraphicsMode,
+} from "../lib/graphicsMode";
 import { mapFragmentShader, mapVertexShader, MAP_SHADER_REV } from "./shaders";
 
 type MarkerData = {
@@ -69,24 +78,19 @@ function loadTexture(url: string, anisotropy: number): Promise<THREE.Texture> {
   });
 }
 
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load ${url}`));
+    img.src = url;
+  });
+}
+
 /** Equirectangular map aspect (width / height). */
 const MAP_ASPECT = 2;
 
-/** Live-loop targets: wallpaper stays light; settings preview stays a bit snappier. */
-function loopConfig(preview: boolean) {
-  return {
-    renderFps: preview ? 30 : 12,
-    /** How often we check whether HH:MM text should change (clocks have no seconds). */
-    labelCheckMs: preview ? 1000 : 2000,
-    settingsPollMs: preview ? 600 : 1000,
-    maxDpr: preview ? 2 : 1.5,
-    antialias: preview,
-    starCount: preview ? 200 : 400,
-    weatherRefreshMs: 15 * 60 * 1000,
-  };
-}
-
-/** contain = letterbox (preview); cover = fill without stretch (wallpaper). */
 function fitMapRect(
   viewW: number,
   viewH: number,
@@ -106,6 +110,82 @@ function fitMapRect(
   return { x: 0, y: (viewH - h) / 2, w, h };
 }
 
+function frustumForView(viewW: number, viewH: number) {
+  const viewAspect = viewW / Math.max(viewH, 1);
+  if (viewAspect >= MAP_ASPECT) {
+    const halfH = 1 / viewAspect;
+    return { left: -1, right: 1, top: halfH, bottom: -halfH };
+  }
+  const halfW = 0.5 * viewAspect;
+  return { left: -halfW, right: halfW, top: 0.5, bottom: -0.5 };
+}
+
+function latLonToNormal(lat: number, lon: number): [number, number, number] {
+  const phi = ((90 - lat) * Math.PI) / 180;
+  const theta = ((lon + 180) * Math.PI) / 180;
+  const x = -Math.sin(phi) * Math.cos(theta);
+  const z = Math.sin(phi) * Math.sin(theta);
+  const y = Math.cos(phi);
+  return [x, y, z];
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/** CPU day/night composite at modest resolution (compatibility mode). */
+function compositeDayNight(
+  day: HTMLImageElement,
+  night: HTMLImageElement,
+  sun: { lat: number; lon: number },
+  target: HTMLCanvasElement,
+  twilight = 0.22,
+): void {
+  const w = target.width;
+  const h = target.height;
+  const ctx = target.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return;
+
+  const work = document.createElement("canvas");
+  work.width = w;
+  work.height = h;
+  const wctx = work.getContext("2d", { willReadFrequently: true });
+  if (!wctx) return;
+
+  wctx.drawImage(day, 0, 0, w, h);
+  const dayData = wctx.getImageData(0, 0, w, h);
+  wctx.drawImage(night, 0, 0, w, h);
+  const nightData = wctx.getImageData(0, 0, w, h);
+
+  const out = ctx.createImageData(w, h);
+  const d = dayData.data;
+  const n = nightData.data;
+  const o = out.data;
+  const sunN = latLonToNormal(sun.lat, sun.lon);
+  const twHi = twilight * 1.35;
+
+  for (let y = 0; y < h; y++) {
+    const lat = 90 - (y / (h - 1)) * 180;
+    for (let x = 0; x < w; x++) {
+      const lon = (x / (w - 1)) * 360 - 180;
+      const p = latLonToNormal(lat, lon);
+      const ndotl = p[0] * sunN[0] + p[1] * sunN[1] + p[2] * sunN[2];
+      const f = smoothstep(-twilight, twHi, ndotl);
+      const i = (y * w + x) * 4;
+      // Night texture is city lights; blend a darkened day with lights.
+      const nr = Math.min(255, d[i]! * 0.18 + n[i]! * 1.55);
+      const ng = Math.min(255, d[i + 1]! * 0.2 + n[i + 1]! * 1.55);
+      const nb = Math.min(255, d[i + 2]! * 0.28 + n[i + 2]! * 1.55);
+      o[i] = d[i]! * f + nr * (1 - f);
+      o[i + 1] = d[i + 1]! * f + ng * (1 - f);
+      o[i + 2] = d[i + 2]! * f + nb * (1 - f);
+      o[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
 export function Globe({ settings, preview = false, className }: GlobeProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
@@ -114,9 +194,31 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
+  const [mode, setMode] = useState<GraphicsMode>(() => initialGraphicsMode());
   settingsRef.current = settings;
 
-  // Apply theme immediately when settings change
+  useEffect(() => {
+    const apply = (next: GraphicsMode) => {
+      setMode((prev) => (prev === next ? prev : next));
+    };
+    const onMode = (e: Event) => {
+      const detail = (e as CustomEvent<GraphicsMode>).detail;
+      if (detail) apply(detail);
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key && e.key !== "orblune.graphicsMode") return;
+      const stored = getStoredGraphicsMode();
+      if (stored) apply(stored);
+    };
+    window.addEventListener(GRAPHICS_MODE_EVENT, onMode);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(GRAPHICS_MODE_EVENT, onMode);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  // Apply theme immediately when settings change (GPU paths only)
   useEffect(() => {
     const mat = mapMatRef.current;
     if (!mat?.uniforms?.themeIndex) return;
@@ -142,92 +244,14 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
     let poll = 0;
     let weatherPoll = 0;
     let ro: ResizeObserver | null = null;
-    let dayTex: THREE.Texture | null = null;
-    let nightTex: THREE.Texture | null = null;
-    let cloudTex: THREE.Texture | null = null;
-    let mapMat: THREE.ShaderMaterial | null = null;
     let mapRect = { x: 0, y: 0, w: 1, h: 1 };
-    const cfg = loopConfig(preview);
+    let viewBox = { w: 1, h: 1 };
+    const cfg = loopConfigFor(mode, preview);
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x03060c);
-
-    const camera = new THREE.OrthographicCamera(-1, 1, 0.5, -0.5, 0.1, 10);
-    camera.position.set(0, 0, 2);
-    camera.lookAt(0, 0, 0);
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: cfg.antialias,
-      alpha: false,
-      powerPreference: preview ? "default" : "low-power",
-    });
-    renderer.setClearColor(0x03060c, 1);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.maxDpr));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.domElement.className = "map-stage";
-    root.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-    sceneRef.current = scene;
-    cameraRef.current = camera;
-
-    const sunUniform = { value: new THREE.Vector2(0, 0) };
-    const themeIndexUniform = { value: 0 };
-    const placeholder = new THREE.MeshBasicMaterial({ color: 0x0d2848 });
-    const mapMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 1, 1, 1),
-      placeholder as THREE.Material,
-    );
-    scene.add(mapMesh);
-
-    // Soft starfield behind letterbox bars
-    {
-      const count = cfg.starCount;
-      const positions = new Float32Array(count * 3);
-      for (let i = 0; i < count; i++) {
-        positions[i * 3] = (Math.random() - 0.5) * 8;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 5;
-        positions[i * 3 + 2] = -1;
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      scene.add(
-        new THREE.Points(
-          geo,
-          new THREE.PointsMaterial({ color: 0xffffff, size: 0.02, sizeAttenuation: true }),
-        ),
-      );
-    }
-
-    function syncCameraToViewport() {
-      const viewW = Math.max(1, root.clientWidth);
-      const viewH = Math.max(1, root.clientHeight);
-      // Wallpaper and preview both fill the view; camera crops the 2:1 map to match.
-      mapRect = fitMapRect(viewW, viewH, "cover");
-      renderer.setSize(viewW, viewH, false);
-
-      const viewAspect = viewW / viewH;
-      if (viewAspect >= MAP_ASPECT) {
-        camera.left = -1;
-        camera.right = 1;
-        const halfH = 1 / viewAspect;
-        camera.top = halfH;
-        camera.bottom = -halfH;
-      } else {
-        camera.top = 0.5;
-        camera.bottom = -0.5;
-        const halfW = 0.5 * viewAspect;
-        camera.left = -halfW;
-        camera.right = halfW;
-      }
-      camera.updateProjectionMatrix();
-
-      labelLayer.style.left = `${mapRect.x}px`;
-      labelLayer.style.top = `${mapRect.y}px`;
-      labelLayer.style.width = `${mapRect.w}px`;
-      labelLayer.style.height = `${mapRect.h}px`;
-
-      // Re-project after frustum/layer size changes so pins stay on cities.
-      layoutLabelsExact();
+    function degradeTo(next: GraphicsMode) {
+      if (disposed || next === mode) return;
+      setStoredGraphicsMode(next, { manual: false });
+      setMode(next);
     }
 
     function buildMarkers(s: AppSettings): MarkerData[] {
@@ -276,7 +300,6 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       if (!(weatherEl instanceof HTMLElement)) return;
       const w = weatherCache.get(m.id);
       if (!w) {
-        // Keep row reserved (invisible placeholder) so card height never collapses.
         weatherEl.innerHTML = `<span class="city-weather-slot" aria-hidden="true">&nbsp;</span>`;
         weatherEl.dataset.empty = "1";
         return;
@@ -289,15 +312,15 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       el.dataset.lat = String(lat);
       el.dataset.lon = String(lon);
       const { u, v } = latLonToMapUV(lat, lon);
-
       const x = u * 2 - 1;
       const y = 0.5 - v;
-      const spanX = camera.right - camera.left;
-      const spanY = camera.top - camera.bottom;
+      const fr = frustumForView(viewBox.w, viewBox.h);
+      const spanX = fr.right - fr.left;
+      const spanY = fr.top - fr.bottom;
       if (spanX === 0 || spanY === 0) return;
 
-      const nx = (x - camera.left) / spanX;
-      const ny = (camera.top - y) / spanY;
+      const nx = (x - fr.left) / spanX;
+      const ny = (fr.top - y) / spanY;
       const left = nx * 100;
       const top = ny * 100;
       const onScreen = nx >= -0.02 && nx <= 1.02 && ny >= -0.05 && ny <= 1.05;
@@ -311,7 +334,6 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       el.style.visibility = onScreen ? "visible" : "hidden";
     }
 
-    /** Pin every card to its lat/lon — no collision drift. */
     function layoutLabelsExact() {
       const markers = buildMarkers(settingsRef.current);
       for (const node of Array.from(labelLayer.querySelectorAll(".city-label"))) {
@@ -330,7 +352,6 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       const cached = weatherCache.get(m.id);
       if (cached && cached.expiresAt > Date.now()) return;
       if (weatherInflight.has(m.id)) return;
-      // Keep stale weather on screen while refreshing — avoids card height jumps.
       weatherInflight.add(m.id);
       fetchWeather(m.lat, m.lon).then((w) => {
         weatherInflight.delete(m.id);
@@ -357,8 +378,253 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
         placeLabel(el, m.lat, m.lon);
         requestWeather(m);
       }
-      // Second frame: layer size is final after insert.
       requestAnimationFrame(() => layoutLabelsExact());
+    }
+
+    function syncLabelLayer() {
+      const viewW = Math.max(1, root.clientWidth);
+      const viewH = Math.max(1, root.clientHeight);
+      viewBox = { w: viewW, h: viewH };
+      mapRect = fitMapRect(viewW, viewH, "cover");
+      labelLayer.style.left = `${mapRect.x}px`;
+      labelLayer.style.top = `${mapRect.y}px`;
+      labelLayer.style.width = `${mapRect.w}px`;
+      labelLayer.style.height = `${mapRect.h}px`;
+      layoutLabelsExact();
+    }
+
+    // ——— Compatibility path (Canvas 2D) ———
+    if (mode === "compat") {
+      const canvas = document.createElement("canvas");
+      canvas.className = "map-stage";
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      root.appendChild(canvas);
+      const mapCanvas = document.createElement("canvas");
+      // Modest bake size keeps CPU cost low on weak machines.
+      mapCanvas.width = preview ? 1024 : 1280;
+      mapCanvas.height = preview ? 512 : 640;
+
+      let dayImg: HTMLImageElement | null = null;
+      let nightImg: HTMLImageElement | null = null;
+      let lastSunKey = "";
+      let timeAcc = 0;
+      let lastLabelCheckMs = 0;
+      let lastClockBucket = -1;
+      let lastTs = performance.now();
+
+      function paint() {
+        const viewW = Math.max(1, root.clientWidth);
+        const viewH = Math.max(1, root.clientHeight);
+        const dpr = Math.min(window.devicePixelRatio || 1, cfg.maxDpr);
+        canvas.width = Math.round(viewW * dpr);
+        canvas.height = Math.round(viewH * dpr);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = "#03060c";
+        ctx.fillRect(0, 0, viewW, viewH);
+        if (!dayImg || !nightImg) return;
+
+        const fr = frustumForView(viewW, viewH);
+        // Same crop as WebGL orthographic cover of the 2×1 plane.
+        const srcW = mapCanvas.width;
+        const srcH = mapCanvas.height;
+        const u0 = (fr.left + 1) / 2;
+        const u1 = (fr.right + 1) / 2;
+        const v0 = (0.5 - fr.top) / 1;
+        const v1 = (0.5 - fr.bottom) / 1;
+        const sx = u0 * srcW;
+        const sy = v0 * srcH;
+        const sw = Math.max(1, (u1 - u0) * srcW);
+        const sh = Math.max(1, (v1 - v0) * srcH);
+        ctx.drawImage(mapCanvas, sx, sy, sw, sh, 0, 0, viewW, viewH);
+      }
+
+      function bakeIfNeeded(force = false) {
+        if (!dayImg || !nightImg) return;
+        const sun = subsolarPoint();
+        const key = `${sun.lat.toFixed(2)},${sun.lon.toFixed(2)}`;
+        if (!force && key === lastSunKey) return;
+        lastSunKey = key;
+        compositeDayNight(dayImg, nightImg, sun, mapCanvas);
+        paint();
+      }
+
+      const animate = (ts: number) => {
+        raf = requestAnimationFrame(animate);
+        if (disposed) return;
+        const dt = (ts - lastTs) / 1000;
+        lastTs = ts;
+        timeAcc += dt;
+        if (timeAcc < 1 / cfg.renderFps) return;
+        timeAcc %= 1 / cfg.renderFps;
+
+        bakeIfNeeded(false);
+
+        const s = settingsRef.current;
+        const showSeconds = Boolean(s.premium && s.showSeconds);
+        labelLayer.dataset.labelSize = s.labelSize ?? "medium";
+        labelLayer.dataset.showSeconds = showSeconds ? "true" : "false";
+
+        const now = new Date();
+        const checkMs = showSeconds ? 250 : cfg.labelCheckMs;
+        if (now.getTime() - lastLabelCheckMs > checkMs) {
+          lastLabelCheckMs = now.getTime();
+          const clockBucket = showSeconds
+            ? Math.floor(now.getTime() / 1000)
+            : Math.floor(now.getTime() / 60_000);
+          if (clockBucket !== lastClockBucket) {
+            lastClockBucket = clockBucket;
+            const markers = buildMarkers(s);
+            for (const node of Array.from(labelLayer.querySelectorAll(".city-label"))) {
+              if (!(node instanceof HTMLElement)) continue;
+              const id = node.dataset.id;
+              if (!id) continue;
+              const m = markers.find((x) => x.id === id);
+              if (!m) continue;
+              updateLabelContent(node, m, s, now);
+            }
+            if (!showSeconds || clockBucket % 60 === 0) layoutLabelsExact();
+          }
+        }
+      };
+
+      syncLabelLayer();
+      ro = new ResizeObserver(() => {
+        syncLabelLayer();
+        paint();
+      });
+      ro.observe(root);
+      rebuildLabels(settingsRef.current);
+      labelLayer.dataset.labelSize = settingsRef.current.labelSize ?? "medium";
+      animate(performance.now());
+
+      let lastJson = JSON.stringify(settingsRef.current);
+      poll = window.setInterval(() => {
+        const json = JSON.stringify(settingsRef.current);
+        if (json !== lastJson) {
+          lastJson = json;
+          rebuildLabels(settingsRef.current);
+        }
+      }, cfg.settingsPollMs);
+
+      weatherPoll = window.setInterval(() => {
+        for (const m of buildMarkers(settingsRef.current)) requestWeather(m);
+      }, cfg.weatherRefreshMs);
+
+      void (async () => {
+        try {
+          const [day, night] = await Promise.all([
+            loadImage("/textures/earth-day.jpg"),
+            loadImage("/textures/earth-night.jpg"),
+          ]);
+          if (disposed) return;
+          dayImg = day;
+          nightImg = night;
+          bakeIfNeeded(true);
+        } catch (err) {
+          console.error("Earth texture load failed (compat)", err);
+        }
+      })();
+
+      return () => {
+        disposed = true;
+        cancelAnimationFrame(raf);
+        if (poll) clearInterval(poll);
+        if (weatherPoll) clearInterval(weatherPoll);
+        ro?.disconnect();
+        labelLayer.replaceChildren();
+        if (canvas.parentElement === root) root.removeChild(canvas);
+      };
+    }
+
+    // ——— WebGL path (gpu / gpu-lite) ———
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x03060c);
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 0.5, -0.5, 0.1, 10);
+    camera.position.set(0, 0, 2);
+    camera.lookAt(0, 0, 0);
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: cfg.antialias,
+        alpha: false,
+        powerPreference: preview ? "default" : "low-power",
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (err) {
+      console.warn("WebGL unavailable, switching to compatibility mode", err);
+      degradeTo("compat");
+      return () => {
+        disposed = true;
+      };
+    }
+
+    renderer.setClearColor(0x03060c, 1);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cfg.maxDpr));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.className = "map-stage";
+    root.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+    sceneRef.current = scene;
+    cameraRef.current = camera;
+
+    const sunUniform = { value: new THREE.Vector2(0, 0) };
+    const themeIndexUniform = { value: 0 };
+    const placeholder = new THREE.MeshBasicMaterial({ color: 0x0d2848 });
+    const mapMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 1, 1, 1),
+      placeholder as THREE.Material,
+    );
+    scene.add(mapMesh);
+
+    if (cfg.starCount > 0) {
+      const count = cfg.starCount;
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 8;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 5;
+        positions[i * 3 + 2] = -1;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      scene.add(
+        new THREE.Points(
+          geo,
+          new THREE.PointsMaterial({ color: 0xffffff, size: 0.02, sizeAttenuation: true }),
+        ),
+      );
+    }
+
+    let dayTex: THREE.Texture | null = null;
+    let nightTex: THREE.Texture | null = null;
+    let cloudTex: THREE.Texture | null = null;
+    let mapMat: THREE.ShaderMaterial | null = null;
+    const probe = createFrameProbe(mode);
+    let probing = false;
+
+    function syncCameraToViewport() {
+      const viewW = Math.max(1, root.clientWidth);
+      const viewH = Math.max(1, root.clientHeight);
+      viewBox = { w: viewW, h: viewH };
+      mapRect = fitMapRect(viewW, viewH, "cover");
+      renderer.setSize(viewW, viewH, false);
+
+      const fr = frustumForView(viewW, viewH);
+      camera.left = fr.left;
+      camera.right = fr.right;
+      camera.top = fr.top;
+      camera.bottom = fr.bottom;
+      camera.updateProjectionMatrix();
+
+      labelLayer.style.left = `${mapRect.x}px`;
+      labelLayer.style.top = `${mapRect.y}px`;
+      labelLayer.style.width = `${mapRect.w}px`;
+      labelLayer.style.height = `${mapRect.h}px`;
+      layoutLabelsExact();
     }
 
     const clock = new THREE.Clock();
@@ -383,7 +649,6 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       labelLayer.dataset.showSeconds = showSeconds ? "true" : "false";
 
       if (mapMat) {
-        // Rebuild GPU program when shader source rev changes (wallpaper HMR / hot update)
         if (mapMat.userData.shaderRev !== MAP_SHADER_REV && dayTex && nightTex && cloudTex) {
           const prev = mapMat;
           mapMat = new THREE.ShaderMaterial({
@@ -412,7 +677,6 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       const checkMs = showSeconds ? 250 : cfg.labelCheckMs;
       if (now.getTime() - lastLabelCheckMs > checkMs) {
         lastLabelCheckMs = now.getTime();
-        // HH:MM → update on minute; HH:MM:SS → update on second.
         const clockBucket = showSeconds
           ? Math.floor(now.getTime() / 1000)
           : Math.floor(now.getTime() / 60_000);
@@ -427,14 +691,22 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
             if (!m) continue;
             updateLabelContent(node, m, s, now);
           }
-          // Keep pins locked to map coords (resize / aspect changes included).
           if (!showSeconds || clockBucket % 60 === 0) {
             layoutLabelsExact();
           }
         }
       }
 
+      const t0 = performance.now();
       renderer.render(scene, camera);
+      if (probing) {
+        const next = probe.sample(performance.now() - t0);
+        if (next) {
+          probing = false;
+          console.info(`[Orblune] Graphics auto-adjusted to ${next}`);
+          degradeTo(next);
+        }
+      }
     };
 
     syncCameraToViewport();
@@ -462,12 +734,9 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
       }
     }, cfg.weatherRefreshMs);
 
-    (async () => {
+    void (async () => {
       try {
-        const aniso = Math.min(
-          renderer.capabilities.getMaxAnisotropy(),
-          preview ? 8 : 4,
-        );
+        const aniso = Math.min(renderer.capabilities.getMaxAnisotropy(), cfg.anisotropy);
         const [day, night, clouds] = await Promise.all([
           loadTexture("/textures/earth-day.jpg", aniso),
           loadTexture("/textures/earth-night.jpg", aniso),
@@ -502,15 +771,16 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
           fragmentShader: mapFragmentShader,
         });
         mapMat.userData.shaderRev = MAP_SHADER_REV;
-        // Apply current theme immediately (constructor uniforms are cloned)
         const s0 = settingsRef.current;
         mapMat.uniforms.themeIndex.value = s0.premium ? mapThemeIndex(s0.mapTheme ?? "natural") : 0;
         mapMatRef.current = mapMat;
         mapMesh.material = mapMat;
         placeholder.dispose();
         renderer.render(scene, camera);
+        probing = true;
       } catch (err) {
         console.error("Earth texture load failed", err);
+        degradeTo("compat");
       }
     })();
 
@@ -536,10 +806,14 @@ export function Globe({ settings, preview = false, className }: GlobeProps) {
         root.removeChild(renderer.domElement);
       }
     };
-  }, [preview]);
+  }, [preview, mode]);
 
   return (
-    <div ref={mountRef} className={className ?? "globe-root"}>
+    <div
+      ref={mountRef}
+      className={className ?? "globe-root"}
+      data-graphics={mode}
+    >
       <div ref={labelsRef} className="map-labels" />
     </div>
   );

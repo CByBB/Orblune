@@ -28,6 +28,15 @@ import {
 import { friendlyError } from "../lib/errors";
 import { LineSelect } from "./LineSelect";
 import { MAP_THEMES, type MapThemeId } from "../lib/mapThemes";
+import {
+  GRAPHICS_MODE_EVENT,
+  GRAPHICS_MODE_OPTIONS,
+  graphicsModeLabel,
+  getStoredGraphicsMode,
+  initialGraphicsMode,
+  setStoredGraphicsMode,
+  type GraphicsMode,
+} from "../lib/graphicsMode";
 import "../styles/app.css";
 import "../styles/globe.css";
 
@@ -58,6 +67,22 @@ export function SettingsApp() {
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>("…");
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
+  const [graphicsMode, setGraphicsMode] = useState<GraphicsMode>(() => initialGraphicsMode());
+
+  useEffect(() => {
+    const sync = () => setGraphicsMode(getStoredGraphicsMode() ?? initialGraphicsMode());
+    const onMode = (e: Event) => {
+      const detail = (e as CustomEvent<GraphicsMode>).detail;
+      if (detail) setGraphicsMode(detail);
+      else sync();
+    };
+    window.addEventListener(GRAPHICS_MODE_EVENT, onMode);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(GRAPHICS_MODE_EVENT, onMode);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   useEffect(() => {
     let statusPoll = 0;
@@ -425,7 +450,7 @@ export function SettingsApp() {
         <div className="panel">
           {onboarding && (
             <div className="banner">
-              Welcome — set your place, pick a few cities, then turn the wallpaper on.
+              Welcome. Set your place, pick a few cities, then turn the wallpaper on.
             </div>
           )}
 
@@ -571,9 +596,32 @@ export function SettingsApp() {
           {tab === "appearance" && (
             <section>
               <h2>Appearance</h2>
+
+              <div className="graphics-note">
+                <label className="row">
+                  <span>Map quality</span>
+                  <LineSelect
+                    aria-label="Map quality"
+                    value={graphicsMode}
+                    options={GRAPHICS_MODE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: o.label,
+                    }))}
+                    onChange={(v) => {
+                      const next = v as GraphicsMode;
+                      setStoredGraphicsMode(next, { manual: true });
+                      setGraphicsMode(next);
+                    }}
+                  />
+                </label>
+                <p className="muted" style={{ marginTop: 10 }}>
+                  Free for everyone. Higher quality looks better; lower eases the load on your PC.
+                </p>
+              </div>
+
               {!settings.premium && (
                 <div className="banner warn">
-                  Appearance options are part of Premium.{" "}
+                  Themes, clocks, and label options below are part of Premium.{" "}
                   <button type="button" className="link" onClick={() => setTab("premium")}>
                     Unlock for $5
                   </button>
@@ -750,7 +798,7 @@ export function SettingsApp() {
                     {payState === "waiting" && "Waiting…"}
                     {payState === "confirming" && "Confirming payment…"}
                     {payState === "idle" && "Unlock for $5"}
-                    {payState === "error" && "Try again — $5"}
+                    {payState === "error" && "Try again ($5)"}
                     {payState === "unlocked" && "Unlocked"}
                   </button>
                   <p className="muted" style={{ marginTop: 10 }}>
@@ -798,10 +846,63 @@ export function SettingsApp() {
           {tab === "about" && (
             <section>
               <h2>About</h2>
-              <p>Orblune {appVersion}</p>
-              <p className="muted">
-                Weather data from the Norwegian Meteorological Institute (MET Norway). Map: Natural Earth II by Tom Patterson. Day and night lighting computed on your PC.
+              <p className="panel-intro">
+                A calm live Earth wallpaper for Windows: real sun day/night, world clocks, and quiet weather on the map.
               </p>
+              <p>
+                Orblune <span className="muted">{appVersion}</span>
+              </p>
+              <p className="muted" style={{ marginTop: 6 }}>
+                By CByBB · Windows 10 &amp; 11
+              </p>
+
+              <h3>Map quality</h3>
+              <p className="muted">
+                Current: {graphicsModeLabel(graphicsMode)}. Change it under Appearance (free for everyone).
+              </p>
+
+              <h3>Credits</h3>
+              <p className="muted">
+                Weather © MET Norway. Earth day map by Tom Patterson (Natural Earth II). Night lights NASA Black Marble. Day/night follows the real sun on your PC.
+              </p>
+
+              <h3>Links</h3>
+              <div className="stack" style={{ gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="link"
+                  style={{ textAlign: "left" }}
+                  onClick={() => void open("https://cbybb.github.io/Orblune/")}
+                >
+                  Website
+                </button>
+                <button
+                  type="button"
+                  className="link"
+                  style={{ textAlign: "left" }}
+                  onClick={() => void open("https://github.com/CByBB/Orblune")}
+                >
+                  Source on GitHub
+                </button>
+                <button
+                  type="button"
+                  className="link"
+                  style={{ textAlign: "left" }}
+                  onClick={() => void open("https://github.com/CByBB/Orblune/issues")}
+                >
+                  Report an issue
+                </button>
+                <button
+                  type="button"
+                  className="link"
+                  style={{ textAlign: "left" }}
+                  onClick={() => void open("mailto:software.vision@dreambuild.cloud")}
+                >
+                  software.vision@dreambuild.cloud
+                </button>
+              </div>
+
+              <h3>Updates</h3>
               <button
                 type="button"
                 className="btn"
@@ -825,7 +926,7 @@ export function SettingsApp() {
               >
                 Check for updates
               </button>
-              {updateMsg && <p className="muted">{updateMsg}</p>}
+              {updateMsg && <p className="muted" style={{ marginTop: 10 }}>{updateMsg}</p>}
             </section>
           )}
         </div>
