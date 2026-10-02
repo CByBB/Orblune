@@ -11,6 +11,7 @@
   --font-display: "Fraunces", "Georgia", serif;
   --pad: clamp(1.4rem, 5.5vw, 5rem);
   --max: 1240px;
+  --header-h: 4.35rem;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -84,18 +85,19 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.05rem var(--pad);
-  background: rgba(3, 6, 12, 0.28);
+  box-sizing: border-box;
+  height: calc(var(--header-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) max(var(--pad), calc((100% - var(--max)) / 2)) 0;
+  background: rgba(3, 6, 12, 0.96);
   border-bottom: 1px solid transparent;
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  transition: background 0.35s var(--ease), border-color 0.35s var(--ease), padding 0.35s var(--ease);
+  transition: background 0.35s var(--ease), border-color 0.35s var(--ease);
 }
 
 .top.scrolled {
-  background: rgba(3, 8, 14, 0.82);
+  background: rgba(3, 8, 14, 0.92);
   border-bottom-color: var(--line-soft);
-  padding-block: 0.8rem;
 }
 
 .brand {
@@ -169,11 +171,16 @@ a {
   display: grid;
   align-items: end;
   overflow: hidden;
+  /* Keep the map fully below the fixed header on first view. */
+  padding-top: calc(var(--header-h) + env(safe-area-inset-top));
 }
 
 .hero-visual {
   position: absolute;
-  inset: 0;
+  top: calc(var(--header-h) + env(safe-area-inset-top));
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 0;
   will-change: transform;
 }
@@ -212,7 +219,7 @@ a {
   z-index: 1;
   width: min(100%, var(--max));
   margin: 0 auto;
-  padding: calc(6.5rem + env(safe-area-inset-top)) var(--pad) clamp(4rem, 12vh, 7rem);
+  padding: clamp(2rem, 6vh, 3.5rem) var(--pad) clamp(4rem, 12vh, 7rem);
 }
 
 .letter {
